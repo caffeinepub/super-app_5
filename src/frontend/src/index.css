@@ -9,87 +9,127 @@
     --font-mono: "Geist Mono", monospace;
     --radius: 0.75rem;
 
-    --background: 0.97 0 0;
-    --foreground: 0.15 0 0;
-    --card: 0.99 0 0;
-    --card-foreground: 0.15 0 0;
-    --popover: 0.99 0 0;
-    --popover-foreground: 0.15 0 0;
+    --background: 0.95 0 0;
+    --foreground: 0.12 0 0;
+    --card: 0.98 0 0;
+    --card-foreground: 0.12 0 0;
+    --popover: 0.98 0 0;
+    --popover-foreground: 0.12 0 0;
 
-    --primary: 0.54 0.24 199;
+    --primary: 0.52 0.28 199;
     --primary-foreground: 0.98 0 0;
 
-    --secondary: 0.65 0.22 40;
+    --secondary: 0.68 0.25 40;
     --secondary-foreground: 0.98 0 0;
-    --muted: 0.92 0 0;
-    --muted-foreground: 0.45 0 0;
+    --muted: 0.88 0 0;
+    --muted-foreground: 0.5 0 0;
 
-    --accent: 0.52 0.22 305;
+    --accent: 0.5 0.26 305;
     --accent-foreground: 0.98 0 0;
 
     --destructive: 0.55 0.22 25;
     --destructive-foreground: 0.98 0 0;
 
-    --border: 0.92 0 0;
-    --input: 0.94 0 0;
-    --ring: 0.54 0.24 199;
+    --border: 0.88 0 0;
+    --input: 0.92 0 0;
+    --ring: 0.52 0.28 199;
 
-    --chart-1: 0.65 0.22 40;
-    --chart-2: 0.52 0.22 305;
-    --chart-3: 0.68 0.21 142;
-    --chart-4: 0.54 0.24 199;
-    --chart-5: 0.45 0.18 250;
+    --chart-1: 0.68 0.25 40;
+    --chart-2: 0.5 0.26 305;
+    --chart-3: 0.7 0.24 142;
+    --chart-4: 0.52 0.28 199;
+    --chart-5: 0.55 0.22 182;
+
+    --bkash: 0.6 0.25 305;
+    --nagad: 0.65 0.26 40;
+    --success: 0.7 0.24 142;
+
+    --gradient-primary: linear-gradient(
+      135deg,
+      oklch(0.52 0.28 199) 0%,
+      oklch(0.55 0.22 182) 100%
+    );
+    --gradient-card: linear-gradient(
+      135deg,
+      oklch(0.98 0 0) 0%,
+      oklch(0.96 0.02 199 / 0.05) 100%
+    );
+    --gradient-accent: linear-gradient(
+      135deg,
+      oklch(0.6 0.25 305) 0%,
+      oklch(0.52 0.28 199) 100%
+    );
 
     --sidebar: 0.98 0 0;
-    --sidebar-foreground: 0.15 0 0;
-    --sidebar-primary: 0.54 0.24 199;
+    --sidebar-foreground: 0.12 0 0;
+    --sidebar-primary: 0.52 0.28 199;
     --sidebar-primary-foreground: 0.98 0 0;
-    --sidebar-accent: 0.92 0 0;
+    --sidebar-accent: 0.88 0 0;
     --sidebar-accent-foreground: 0.25 0 0;
-    --sidebar-border: 0.92 0 0;
-    --sidebar-ring: 0.54 0.24 199;
+    --sidebar-border: 0.88 0 0;
+    --sidebar-ring: 0.52 0.28 199;
   }
 
   .dark {
-    --background: 0.13 0 0;
+    --background: 0.1 0 0;
     --foreground: 0.95 0 0;
-    --card: 0.16 0 0;
+    --card: 0.14 0 0;
     --card-foreground: 0.95 0 0;
-    --popover: 0.2 0 0;
+    --popover: 0.18 0 0;
     --popover-foreground: 0.95 0 0;
 
-    --primary: 0.6 0.25 199;
-    --primary-foreground: 0.13 0 0;
+    --primary: 0.62 0.28 199;
+    --primary-foreground: 0.1 0 0;
 
-    --secondary: 0.72 0.23 40;
-    --secondary-foreground: 0.13 0 0;
-    --muted: 0.22 0 0;
-    --muted-foreground: 0.6 0 0;
+    --secondary: 0.75 0.27 40;
+    --secondary-foreground: 0.1 0 0;
+    --muted: 0.2 0 0;
+    --muted-foreground: 0.65 0 0;
 
-    --accent: 0.58 0.23 305;
-    --accent-foreground: 0.13 0 0;
+    --accent: 0.6 0.28 305;
+    --accent-foreground: 0.1 0 0;
 
     --destructive: 0.65 0.19 22;
-    --destructive-foreground: 0.13 0 0;
+    --destructive-foreground: 0.1 0 0;
 
-    --border: 0.25 0 0;
-    --input: 0.22 0 0;
-    --ring: 0.6 0.25 199;
+    --border: 0.22 0 0;
+    --input: 0.18 0 0;
+    --ring: 0.62 0.28 199;
 
-    --chart-1: 0.72 0.23 40;
-    --chart-2: 0.58 0.23 305;
-    --chart-3: 0.72 0.22 142;
-    --chart-4: 0.6 0.25 199;
-    --chart-5: 0.55 0.2 250;
+    --chart-1: 0.75 0.27 40;
+    --chart-2: 0.6 0.28 305;
+    --chart-3: 0.75 0.26 142;
+    --chart-4: 0.62 0.28 199;
+    --chart-5: 0.62 0.26 182;
 
-    --sidebar: 0.16 0 0;
+    --bkash: 0.68 0.27 305;
+    --nagad: 0.72 0.28 40;
+    --success: 0.75 0.26 142;
+
+    --gradient-primary: linear-gradient(
+      135deg,
+      oklch(0.62 0.28 199) 0%,
+      oklch(0.62 0.26 182) 100%
+    );
+    --gradient-card: linear-gradient(
+      135deg,
+      oklch(0.14 0 0) 0%,
+      oklch(0.16 0.02 199 / 0.08) 100%
+    );
+    --gradient-accent: linear-gradient(
+      135deg,
+      oklch(0.68 0.27 305) 0%,
+      oklch(0.62 0.28 199) 100%
+    );
+
+    --sidebar: 0.14 0 0;
     --sidebar-foreground: 0.95 0 0;
-    --sidebar-primary: 0.6 0.25 199;
-    --sidebar-primary-foreground: 0.13 0 0;
-    --sidebar-accent: 0.22 0 0;
+    --sidebar-primary: 0.62 0.28 199;
+    --sidebar-primary-foreground: 0.1 0 0;
+    --sidebar-accent: 0.2 0 0;
     --sidebar-accent-foreground: 0.85 0 0;
-    --sidebar-border: 0.25 0 0;
-    --sidebar-ring: 0.6 0.25 199;
+    --sidebar-border: 0.22 0 0;
+    --sidebar-ring: 0.62 0.28 199;
   }
 
   * {
@@ -124,6 +164,42 @@
 @layer utilities {
   .transition-smooth {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .gradient-card {
+    background: var(--gradient-card);
+  }
+
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .gradient-accent {
+    background: var(--gradient-accent);
+  }
+
+  .stat-highlight {
+    @apply rounded-xl border border-border bg-gradient-to-br from-primary/10 to-accent/5 p-6 backdrop-blur-sm;
+  }
+
+  .stat-value {
+    @apply font-display text-3xl font-bold text-primary;
+  }
+
+  .stat-label {
+    @apply text-sm font-semibold text-muted-foreground uppercase tracking-wide mt-2;
+  }
+
+  .badge-notification {
+    @apply inline-flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs font-bold w-6 h-6 animate-pulse;
+  }
+
+  .payment-card-bkash {
+    @apply rounded-lg border-2 border-[oklch(var(--bkash))] bg-[oklch(var(--bkash))] bg-opacity-10 p-4 transition-smooth hover:shadow-md;
+  }
+
+  .payment-card-nagad {
+    @apply rounded-lg border-2 border-[oklch(var(--nagad))] bg-[oklch(var(--nagad))] bg-opacity-10 p-4 transition-smooth hover:shadow-md;
   }
 
   .category-card {
@@ -316,5 +392,21 @@
 
   .cart-badge {
     @apply inline-flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs font-bold w-5 h-5;
+  }
+
+  .commission-card {
+    @apply rounded-xl border border-border bg-gradient-to-br from-card to-primary/5 p-6;
+  }
+
+  .admin-section-header {
+    @apply font-display text-2xl font-bold text-foreground mb-6;
+  }
+
+  .filter-badge-active {
+    @apply bg-primary text-primary-foreground;
+  }
+
+  .filter-badge-inactive {
+    @apply bg-muted text-muted-foreground hover:bg-muted/70;
   }
 }

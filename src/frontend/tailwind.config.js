@@ -83,6 +83,8 @@ export default {
         md: "0 4px 8px 0 rgba(0,0,0,0.1)",
         elevated: "0 8px 16px 0 rgba(0,0,0,0.12)",
         dropdown: "0 4px 12px 0 rgba(0,0,0,0.15)",
+        "glow-primary": "0 0 20px 0 rgba(82, 142, 255, 0.2)",
+        "glow-accent": "0 0 20px 0 rgba(128, 61, 255, 0.2)",
       },
       keyframes: {
         "accordion-down": {
@@ -101,12 +103,22 @@ export default {
           from: { opacity: "0", transform: "scale(0.95)" },
           to: { opacity: "1", transform: "scale(1)" },
         },
+        "float": {
+          "0%, 100%": { transform: "translateY(0px)" },
+          "50%": { transform: "translateY(-8px)" },
+        },
+        "pulse-glow": {
+          "0%, 100%": { opacity: "1", boxShadow: "0 0 20px 0 rgba(82, 142, 255, 0.3)" },
+          "50%": { opacity: "0.8", boxShadow: "0 0 30px 0 rgba(82, 142, 255, 0.1)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "fade-in": "fade-in 0.2s ease-out",
         "scale-in": "scale-in 0.2s ease-out",
+        "float": "float 3s ease-in-out infinite",
+        "pulse-glow": "pulse-glow 2s ease-in-out infinite",
       },
     },
   },

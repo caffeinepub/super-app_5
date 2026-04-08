@@ -1,3 +1,20 @@
+type WithdrawStatus = 
+ variant {
+   Approved;
+   Pending;
+   Rejected;
+ };
+type WithdrawRequest = 
+ record {
+   accountNumber: text;
+   amount: float64;
+   id: nat;
+   method: PaymentMethod;
+   requestedAt: Timestamp;
+   reviewedAt: opt Timestamp;
+   sellerId: UserId;
+   status: WithdrawStatus;
+ };
 type UserRole = 
  variant {
    Admin;
@@ -7,6 +24,38 @@ type UserRole =
 type UserProfile = record {displayName: text;};
 type UserId = principal;
 type Timestamp = int;
+type SellerWallet = 
+ record {
+   pendingWithdrawal: float64;
+   sellerId: UserId;
+   totalEarnings: float64;
+   totalWithdrawn: float64;
+ };
+type PaymentStatus = 
+ variant {
+   Approved;
+   Pending;
+   Rejected;
+ };
+type PaymentRecord = 
+ record {
+   amount: float64;
+   commission: float64;
+   id: nat;
+   method: PaymentMethod;
+   orderId: nat;
+   reviewedAt: opt Timestamp;
+   sellerEarnings: float64;
+   status: PaymentStatus;
+   submittedAt: Timestamp;
+   transactionId: text;
+   userId: UserId;
+ };
+type PaymentMethod = 
+ variant {
+   Nagad;
+   bKash;
+ };
 type OrderStatus = 
  variant {
    Delivered;
@@ -28,25 +77,90 @@ type Order =
    total: float64;
    userId: UserId;
  };
+type CommissionSummary = 
+ record {
+   byPeriod: vec record {
+                   text;
+                   float64;
+                 };
+   topProducts: vec record {
+                      text;
+                      float64;
+                    };
+   topSellers: vec record {
+                     UserId;
+                     float64;
+                   };
+   totalCommission: float64;
+ };
+type CommissionRecord = 
+ record {
+   amount: float64;
+   id: nat;
+   orderId: nat;
+   productId: text;
+   rate: float64;
+   sellerId: UserId;
+   timestamp: Timestamp;
+ };
 service : {
+  approvePayment: (id: nat) -> (bool);
+  approveWithdrawal: (id: nat) -> (bool);
   assignRole: (userId: UserId, role: UserRole) -> (variant {
                                                      err: text;
                                                      ok;
                                                    });
   createOrder: (items: vec OrderItem) -> (Order);
+  getAdminStats: () ->
+   (record {
+      newOrders: nat;
+      pendingPayments: nat;
+      pendingWithdrawals: nat;
+    }) query;
   getAllOrders: () -> (vec Order) query;
+  getCommissionByMonth: (months: nat) -> (vec record {
+                                                text;
+                                                float64;
+                                              }) query;
+  getCommissionByPeriod: (filter: text) -> (vec record {
+                                                  text;
+                                                  float64;
+                                                }) query;
+  getCommissionSummary: () -> (CommissionSummary) query;
   getFeaturedIds: (category: text) -> (vec text) query;
   getFeaturedIdsByCategory: (category: text) -> (vec text) query;
   getMyOrders: () -> (vec Order) query;
   getMyPrincipal: () -> (text) query;
   getMyRole: () -> (UserRole) query;
+  getPayment: (id: nat) -> (opt PaymentRecord) query;
+  getSellerWallet: (sellerId: UserId) -> (opt SellerWallet) query;
+  getTopProducts: (limit: nat) -> (vec record {
+                                         text;
+                                         float64;
+                                       }) query;
+  getTopSellers: (limit: nat) -> (vec record {
+                                        UserId;
+                                        float64;
+                                      }) query;
   getUserProfile: (userId: UserId) -> (opt UserProfile) query;
   getUserRole: (userId: UserId) -> (UserRole) query;
   isAdminSetup: () -> (bool) query;
+  listAllPayments: () -> (vec PaymentRecord) query;
+  listAllWithdrawals: () -> (vec WithdrawRequest) query;
+  listCommissions: () -> (vec CommissionRecord) query;
+  listPendingPayments: () -> (vec PaymentRecord) query;
+  listPendingWithdrawals: () -> (vec WithdrawRequest) query;
+  myPayments: () -> (vec PaymentRecord) query;
+  myWallet: () -> (SellerWallet) query;
+  myWithdrawals: () -> (vec WithdrawRequest) query;
+  rejectPayment: (id: nat) -> (bool);
+  rejectWithdrawal: (id: nat) -> (bool);
   requestAdminRole: () -> (variant {
                              err: text;
                              ok: text;
                            });
+  requestWithdrawal: (amount: float64, method: PaymentMethod, accountNumber:
+   text) -> (nat);
   resetAdminPassword: (oldHash: text, newHash: text) ->
    (variant {
       err: text;
@@ -57,6 +171,8 @@ service : {
                                                  err: text;
                                                  ok;
                                                });
+  submitPayment: (orderId: nat, method: PaymentMethod, transactionId: 
+   text, amount: float64) -> (nat);
   updateFeaturedIds: (category: text, ids: vec text, passwordHash: text) ->
    (variant {
       err: text;

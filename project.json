@@ -1,26 +1,26 @@
 {
-  "overview": "Super App is a full-stack mobile-first web application with Shop, Delivery, and Service categories. Features include product browsing, cart management, cart checkout with order placement, order history tracking, service booking, and a full Admin Panel with featured items management, user roles, and order approvals.",
+  "overview": "A full-featured Super App for Bangladesh with Shop, Delivery, and Service categories. Features advanced commission tracking (10% auto-deduction), bKash/Nagad payment integration with admin verification, seller wallet system with withdrawal requests, analytics with 12-month charts, and a deep colorful admin dashboard.",
   "features": [
-    "Product browsing with cart and cart checkout flow",
-    "Order placement that appears immediately in order history",
-    "Delivery tracking with order status (Pending/Ongoing/Delivered)",
-    "Service booking page",
-    "Email/password login and signup for regular users",
-    "Admin panel with dashboard, order management, product/service lists, featured items, and role approvals",
-    "Internet Identity login for admin access",
-    "Role-based access control (Customer, Seller, Admin)"
+    "Commission tracking with 10% auto-deduction from all orders",
+    "bKash & Nagad manual payment with transaction ID verification",
+    "Seller wallet system with earnings tracking and withdrawal requests",
+    "Analytics dashboard with 12-month charts and daily/weekly/monthly filters",
+    "Admin panel with Commission Dashboard, Payment Verification, and Withdrawal Management tabs",
+    "Deep colorful modern UI with gradient cards and highlight stats",
+    "Notification badges for pending payments, withdrawals, and new orders",
+    "Role-based access control with Internet Identity for admins"
   ],
   "category": "ecommerce",
   "tags": [
-    "shop",
-    "cart",
-    "checkout",
-    "orders",
-    "delivery",
-    "services",
-    "admin",
+    "super-app",
     "ecommerce",
-    "mobile-first"
+    "commission",
+    "bkash",
+    "nagad",
+    "bangladesh",
+    "seller-wallet",
+    "analytics",
+    "admin-panel"
   ],
-  "last_updated": "2026-04-08T16:28:09.317Z"
+  "last_updated": "2026-04-08T17:30:06.976Z"
 }

@@ -10,6 +10,21 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export interface CommissionRecord {
+  'id' : bigint,
+  'rate' : number,
+  'productId' : string,
+  'orderId' : bigint,
+  'timestamp' : Timestamp,
+  'sellerId' : UserId,
+  'amount' : number,
+}
+export interface CommissionSummary {
+  'totalCommission' : number,
+  'topProducts' : Array<[string, number]>,
+  'topSellers' : Array<[UserId, number]>,
+  'byPeriod' : Array<[string, number]>,
+}
 export interface Order {
   'id' : bigint,
   'status' : OrderStatus,
@@ -22,29 +37,94 @@ export interface OrderItem { 'qty' : bigint, 'name' : string, 'price' : number }
 export type OrderStatus = { 'Delivered' : null } |
   { 'Ongoing' : null } |
   { 'Pending' : null };
+export type PaymentMethod = { 'Nagad' : null } |
+  { 'bKash' : null };
+export interface PaymentRecord {
+  'id' : bigint,
+  'status' : PaymentStatus,
+  'method' : PaymentMethod,
+  'sellerEarnings' : number,
+  'userId' : UserId,
+  'submittedAt' : Timestamp,
+  'commission' : number,
+  'reviewedAt' : [] | [Timestamp],
+  'orderId' : bigint,
+  'amount' : number,
+  'transactionId' : string,
+}
+export type PaymentStatus = { 'Approved' : null } |
+  { 'Rejected' : null } |
+  { 'Pending' : null };
+export interface SellerWallet {
+  'pendingWithdrawal' : number,
+  'totalWithdrawn' : number,
+  'totalEarnings' : number,
+  'sellerId' : UserId,
+}
 export type Timestamp = bigint;
 export type UserId = Principal;
 export interface UserProfile { 'displayName' : string }
 export type UserRole = { 'Customer' : null } |
   { 'Seller' : null } |
   { 'Admin' : null };
+export interface WithdrawRequest {
+  'id' : bigint,
+  'status' : WithdrawStatus,
+  'method' : PaymentMethod,
+  'reviewedAt' : [] | [Timestamp],
+  'sellerId' : UserId,
+  'accountNumber' : string,
+  'amount' : number,
+  'requestedAt' : Timestamp,
+}
+export type WithdrawStatus = { 'Approved' : null } |
+  { 'Rejected' : null } |
+  { 'Pending' : null };
 export interface _SERVICE {
+  'approvePayment' : ActorMethod<[bigint], boolean>,
+  'approveWithdrawal' : ActorMethod<[bigint], boolean>,
   'assignRole' : ActorMethod<
     [UserId, UserRole],
     { 'ok' : null } |
       { 'err' : string }
   >,
   'createOrder' : ActorMethod<[Array<OrderItem>], Order>,
+  'getAdminStats' : ActorMethod<
+    [],
+    {
+      'newOrders' : bigint,
+      'pendingPayments' : bigint,
+      'pendingWithdrawals' : bigint,
+    }
+  >,
   'getAllOrders' : ActorMethod<[], Array<Order>>,
+  'getCommissionByMonth' : ActorMethod<[bigint], Array<[string, number]>>,
+  'getCommissionByPeriod' : ActorMethod<[string], Array<[string, number]>>,
+  'getCommissionSummary' : ActorMethod<[], CommissionSummary>,
   'getFeaturedIds' : ActorMethod<[string], Array<string>>,
   'getFeaturedIdsByCategory' : ActorMethod<[string], Array<string>>,
   'getMyOrders' : ActorMethod<[], Array<Order>>,
   'getMyPrincipal' : ActorMethod<[], string>,
   'getMyRole' : ActorMethod<[], UserRole>,
+  'getPayment' : ActorMethod<[bigint], [] | [PaymentRecord]>,
+  'getSellerWallet' : ActorMethod<[UserId], [] | [SellerWallet]>,
+  'getTopProducts' : ActorMethod<[bigint], Array<[string, number]>>,
+  'getTopSellers' : ActorMethod<[bigint], Array<[UserId, number]>>,
   'getUserProfile' : ActorMethod<[UserId], [] | [UserProfile]>,
   'getUserRole' : ActorMethod<[UserId], UserRole>,
   'isAdminSetup' : ActorMethod<[], boolean>,
+  'listAllPayments' : ActorMethod<[], Array<PaymentRecord>>,
+  'listAllWithdrawals' : ActorMethod<[], Array<WithdrawRequest>>,
+  'listCommissions' : ActorMethod<[], Array<CommissionRecord>>,
+  'listPendingPayments' : ActorMethod<[], Array<PaymentRecord>>,
+  'listPendingWithdrawals' : ActorMethod<[], Array<WithdrawRequest>>,
+  'myPayments' : ActorMethod<[], Array<PaymentRecord>>,
+  'myWallet' : ActorMethod<[], SellerWallet>,
+  'myWithdrawals' : ActorMethod<[], Array<WithdrawRequest>>,
+  'rejectPayment' : ActorMethod<[bigint], boolean>,
+  'rejectWithdrawal' : ActorMethod<[bigint], boolean>,
   'requestAdminRole' : ActorMethod<[], { 'ok' : string } | { 'err' : string }>,
+  'requestWithdrawal' : ActorMethod<[number, PaymentMethod, string], bigint>,
   'resetAdminPassword' : ActorMethod<
     [string, string],
     { 'ok' : null } |
@@ -55,6 +135,10 @@ export interface _SERVICE {
     [string],
     { 'ok' : null } |
       { 'err' : string }
+  >,
+  'submitPayment' : ActorMethod<
+    [bigint, PaymentMethod, string, number],
+    bigint
   >,
   'updateFeaturedIds' : ActorMethod<
     [string, Array<string>, string],

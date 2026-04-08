@@ -1,6 +1,16 @@
 // Version: 1.0.0
 type Category__202766044 = Category__936342486;
 type Category__936342486 = Text;
+type CommissionRecord__774282755 =
+  {
+    amount : Float;
+    id : Nat;
+    orderId : Nat;
+    productId : Text;
+    rate : Float;
+    sellerId : UserId__74810557;
+    timestamp : Timestamp__600497786
+  };
 type Data__791452850<K, V> =
   {var count : Nat__490723111; kvs : [var ?(K, V)]};
 type Internal__8484328<K, V> =
@@ -21,17 +31,69 @@ type Order__141779993 =
     total : Float;
     userId : UserId__41638867
   };
+type PaymentMethod__281063395 = PaymentMethod__536423365;
+type PaymentMethod__536423365 = {#Nagad; #bKash};
+type PaymentRecord__879948694 =
+  {
+    amount : Float;
+    commission : Float;
+    id : Nat;
+    method : PaymentMethod__536423365;
+    orderId : Nat;
+    reviewedAt : ?Timestamp__131386122;
+    sellerEarnings : Float;
+    status : PaymentStatus__296016569;
+    submittedAt : Timestamp__131386122;
+    transactionId : Text;
+    userId : UserId__283363247
+  };
+type PaymentStatus__296016569 = {#Approved; #Pending; #Rejected};
+type SellerWallet__714271276 =
+  {
+    pendingWithdrawal : Float;
+    sellerId : UserId__74810557;
+    totalEarnings : Float;
+    totalWithdrawn : Float
+  };
+type Timestamp__131386122 = Timestamp__301639476;
 type Timestamp__301639476 = Int;
+type Timestamp__600497786 = Timestamp__301639476;
 type Timestamp__813860109 = Timestamp__301639476;
 type UserId__158757552 = Principal;
 type UserId__164923593 = UserId__158757552;
+type UserId__283363247 = UserId__158757552;
 type UserId__41638867 = UserId__158757552;
 type UserId__423380635 = UserId__158757552;
+type UserId__74810557 = UserId__158757552;
 type UserProfile__190304746 = {displayName : Text};
 type UserProfile__826653903 = UserProfile__190304746;
 type UserRole__655227432 = {#Admin; #Customer; #Seller};
+type WithdrawRequest__106871691 =
+  {
+    accountNumber : Text;
+    amount : Float;
+    id : Nat;
+    method : PaymentMethod__281063395;
+    requestedAt : Timestamp__600497786;
+    reviewedAt : ?Timestamp__600497786;
+    sellerId : UserId__74810557;
+    status : WithdrawStatus__45521848
+  };
+type WithdrawStatus__45521848 = {#Approved; #Pending; #Rejected};
 actor {
   stable adminState : {var adminOwner : ?Principal; var passwordHash : ?Text};
+  stable commissions :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?CommissionRecord__774282755]];
+      var elementIndex : Nat__490723111
+    };
+  stable counters :
+    {
+      var nextCommissionId : Nat;
+      var nextPaymentId : Nat;
+      var nextWithdrawId : Nat
+    };
   stable featured :
     {
       var root : Node__46230540<Category__202766044, [Text]>;
@@ -44,6 +106,12 @@ actor {
       var blocks : [var [var ?Order__141779993]];
       var elementIndex : Nat__490723111
     };
+  stable payments :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?PaymentRecord__879948694]];
+      var elementIndex : Nat__490723111
+    };
   stable profiles :
     {
       var root : Node__46230540<UserId__423380635, UserProfile__826653903>;
@@ -53,5 +121,16 @@ actor {
     {
       var root : Node__46230540<UserId__164923593, UserRole__655227432>;
       var size : Nat__490723111
+    };
+  stable wallets :
+    {
+      var root : Node__46230540<UserId__158757552, SellerWallet__714271276>;
+      var size : Nat__490723111
+    };
+  stable withdrawals :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?WithdrawRequest__106871691]];
+      var elementIndex : Nat__490723111
     }
 };

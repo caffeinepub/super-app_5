@@ -74,3 +74,26 @@ export interface Order {
   date: number;
   total: number;
 }
+
+// Payment types
+export type PaymentMethod = "bkash" | "nagad";
+
+export type PaymentStatus = "Pending" | "Approved" | "Rejected";
+
+export interface PaymentRecord {
+  id: string;
+  orderId: string;
+  method: PaymentMethod;
+  transactionId: string;
+  amount: number;
+  status: PaymentStatus;
+  createdAt: number;
+  userId?: string;
+}
+
+export interface SubmitPaymentInput {
+  orderId: string;
+  method: PaymentMethod;
+  transactionId: string;
+  amount: number;
+}

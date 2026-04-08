@@ -7,12 +7,40 @@ export interface None {
     __kind__: "None";
 }
 export type Option<T> = Some<T> | None;
-export type UserId = Principal;
 export type Timestamp = bigint;
+export interface SellerWallet {
+    pendingWithdrawal: number;
+    totalWithdrawn: number;
+    totalEarnings: number;
+    sellerId: UserId;
+}
+export interface PaymentRecord {
+    id: bigint;
+    status: PaymentStatus;
+    method: PaymentMethod;
+    sellerEarnings: number;
+    userId: UserId;
+    submittedAt: Timestamp;
+    commission: number;
+    reviewedAt?: Timestamp;
+    orderId: bigint;
+    amount: number;
+    transactionId: string;
+}
 export interface OrderItem {
     qty: bigint;
     name: string;
     price: number;
+}
+export interface WithdrawRequest {
+    id: bigint;
+    status: WithdrawStatus;
+    method: PaymentMethod;
+    reviewedAt?: Timestamp;
+    sellerId: UserId;
+    accountNumber: string;
+    amount: number;
+    requestedAt: Timestamp;
 }
 export interface Order {
     id: bigint;
@@ -22,6 +50,22 @@ export interface Order {
     date: Timestamp;
     items: Array<OrderItem>;
 }
+export type UserId = Principal;
+export interface CommissionRecord {
+    id: bigint;
+    rate: number;
+    productId: string;
+    orderId: bigint;
+    timestamp: Timestamp;
+    sellerId: UserId;
+    amount: number;
+}
+export interface CommissionSummary {
+    totalCommission: number;
+    topProducts: Array<[string, number]>;
+    topSellers: Array<[UserId, number]>;
+    byPeriod: Array<[string, number]>;
+}
 export interface UserProfile {
     displayName: string;
 }
@@ -30,12 +74,23 @@ export enum OrderStatus {
     Ongoing = "Ongoing",
     Pending = "Pending"
 }
+export enum PaymentMethod {
+    Nagad = "Nagad",
+    bKash = "bKash"
+}
 export enum UserRole {
     Customer = "Customer",
     Seller = "Seller",
     Admin = "Admin"
 }
+export enum WithdrawStatus {
+    Approved = "Approved",
+    Rejected = "Rejected",
+    Pending = "Pending"
+}
 export interface backendInterface {
+    approvePayment(id: bigint): Promise<boolean>;
+    approveWithdrawal(id: bigint): Promise<boolean>;
     assignRole(userId: UserId, role: UserRole): Promise<{
         __kind__: "ok";
         ok: null;
@@ -44,15 +99,37 @@ export interface backendInterface {
         err: string;
     }>;
     createOrder(items: Array<OrderItem>): Promise<Order>;
+    getAdminStats(): Promise<{
+        newOrders: bigint;
+        pendingPayments: bigint;
+        pendingWithdrawals: bigint;
+    }>;
     getAllOrders(): Promise<Array<Order>>;
+    getCommissionByMonth(months: bigint): Promise<Array<[string, number]>>;
+    getCommissionByPeriod(filter: string): Promise<Array<[string, number]>>;
+    getCommissionSummary(): Promise<CommissionSummary>;
     getFeaturedIds(category: string): Promise<Array<string>>;
     getFeaturedIdsByCategory(category: string): Promise<Array<string>>;
     getMyOrders(): Promise<Array<Order>>;
     getMyPrincipal(): Promise<string>;
     getMyRole(): Promise<UserRole>;
+    getPayment(id: bigint): Promise<PaymentRecord | null>;
+    getSellerWallet(sellerId: UserId): Promise<SellerWallet | null>;
+    getTopProducts(limit: bigint): Promise<Array<[string, number]>>;
+    getTopSellers(limit: bigint): Promise<Array<[UserId, number]>>;
     getUserProfile(userId: UserId): Promise<UserProfile | null>;
     getUserRole(userId: UserId): Promise<UserRole>;
     isAdminSetup(): Promise<boolean>;
+    listAllPayments(): Promise<Array<PaymentRecord>>;
+    listAllWithdrawals(): Promise<Array<WithdrawRequest>>;
+    listCommissions(): Promise<Array<CommissionRecord>>;
+    listPendingPayments(): Promise<Array<PaymentRecord>>;
+    listPendingWithdrawals(): Promise<Array<WithdrawRequest>>;
+    myPayments(): Promise<Array<PaymentRecord>>;
+    myWallet(): Promise<SellerWallet>;
+    myWithdrawals(): Promise<Array<WithdrawRequest>>;
+    rejectPayment(id: bigint): Promise<boolean>;
+    rejectWithdrawal(id: bigint): Promise<boolean>;
     requestAdminRole(): Promise<{
         __kind__: "ok";
         ok: string;
@@ -60,6 +137,7 @@ export interface backendInterface {
         __kind__: "err";
         err: string;
     }>;
+    requestWithdrawal(amount: number, method: PaymentMethod, accountNumber: string): Promise<bigint>;
     resetAdminPassword(oldHash: string, newHash: string): Promise<{
         __kind__: "ok";
         ok: null;
@@ -75,6 +153,7 @@ export interface backendInterface {
         __kind__: "err";
         err: string;
     }>;
+    submitPayment(orderId: bigint, method: PaymentMethod, transactionId: string, amount: number): Promise<bigint>;
     updateFeaturedIds(category: string, ids: Array<string>, passwordHash: string): Promise<{
         __kind__: "ok";
         ok: null;

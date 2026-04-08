@@ -9,6 +9,7 @@ import {
   Truck,
   User,
   UserPlus,
+  Wallet,
   Wrench,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
@@ -30,7 +31,7 @@ export function Layout({ children }: LayoutProps) {
   const router = useRouter();
   const currentPath = routerState.location.pathname;
 
-  const { isAuthenticated, email, logout, isInitializing } = useAuth();
+  const { isAuthenticated, email, logout, isInitializing, role } = useAuth();
   const { cartCount, toastMessage, dismissToast } = useCart();
 
   const isAdminActive = currentPath === "/admin";
@@ -110,6 +111,24 @@ export function Layout({ children }: LayoutProps) {
                 <ShieldCheck size={15} strokeWidth={2.5} />
                 Admin
               </button>
+
+              {/* Wallet link — visible only for authenticated sellers */}
+              {isAuthenticated && role === "Seller" && (
+                <button
+                  type="button"
+                  onClick={() => void router.navigate({ to: "/wallet" })}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-body font-semibold transition-smooth ml-1 ${
+                    currentPath === "/wallet"
+                      ? "bg-emerald-600 text-white shadow-md"
+                      : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900 border border-emerald-300"
+                  }`}
+                  data-ocid="nav-wallet"
+                  aria-label="My wallet"
+                >
+                  <Wallet size={15} strokeWidth={2.5} />
+                  Wallet
+                </button>
+              )}
             </nav>
 
             {/* Auth section */}
@@ -205,12 +224,14 @@ export function Layout({ children }: LayoutProps) {
       {/* Main content */}
       <main className="flex-1">{children}</main>
 
-      {/* Mobile bottom nav — 5 columns, Admin is always the 5th */}
+      {/* Mobile bottom nav */}
       <nav
         className="sm:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50"
         aria-label="Mobile navigation"
       >
-        <div className="grid grid-cols-5 h-16">
+        <div
+          className={`grid h-16 ${isAuthenticated && role === "Seller" ? "grid-cols-6" : "grid-cols-5"}`}
+        >
           {navItems.map(({ to, label, icon: Icon }) => {
             const isActive =
               currentPath === to ||
@@ -250,7 +271,28 @@ export function Layout({ children }: LayoutProps) {
             );
           })}
 
-          {/* Admin — 5th column, always visible with purple accent */}
+          {/* Wallet — visible for sellers only */}
+          {isAuthenticated && role === "Seller" && (
+            <button
+              type="button"
+              onClick={() => void router.navigate({ to: "/wallet" })}
+              className={`relative flex flex-col items-center justify-center gap-0.5 transition-smooth ${
+                currentPath === "/wallet"
+                  ? "text-white bg-emerald-600"
+                  : "text-emerald-600 bg-emerald-50"
+              }`}
+              aria-label="My wallet"
+              data-ocid="mobile-nav-wallet"
+            >
+              <Wallet
+                size={20}
+                strokeWidth={currentPath === "/wallet" ? 2.5 : 2}
+              />
+              <span className="text-[10px] font-body font-bold">Wallet</span>
+            </button>
+          )}
+
+          {/* Admin — always visible with purple accent */}
           <button
             type="button"
             onClick={() => void router.navigate({ to: "/admin" })}

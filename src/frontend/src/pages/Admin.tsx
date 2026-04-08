@@ -6,6 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  AlertTriangle,
+  ArrowDownCircle,
+  BadgeDollarSign,
   CheckCircle,
   ChevronDown,
   ChevronUp,
@@ -21,19 +24,44 @@ import {
   ShieldAlert,
   ShieldCheck,
   Star,
+  TrendingUp,
   UserCheck,
   Users,
+  Wallet,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { toast } from "sonner";
 import { OrderStatus } from "../backend.d";
 import { type AdminCategory, useAdmin } from "../hooks/useAdmin";
 import { useAdminApprovals } from "../hooks/useAdminApprovals";
 import { useAdminOrders } from "../hooks/useAdminOrders";
+import {
+  useAdminPendingPayments,
+  useApproveAdminPayment,
+} from "../hooks/useAdminPayments";
+import {
+  useAdminPendingWithdrawals,
+  useAdminWithdrawalAction,
+} from "../hooks/useAdminWithdrawals";
 import { useAuth } from "../hooks/useAuth";
+import {
+  useAdminStats,
+  useCommissionByPeriod,
+  useTopProducts,
+  useTopSellers,
+} from "../hooks/useCommission";
 
-// --- Password strength helper ---
+// --- Helpers ---
 function getPasswordStrength(pw: string): {
   score: number;
   label: string;
@@ -54,6 +82,15 @@ function getPasswordStrength(pw: string): {
     { label: "Very strong", color: "bg-primary" },
   ];
   return { score, ...map[score] };
+}
+
+function NotificationBadge({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold w-5 h-5 animate-pulse shrink-0">
+      {count > 99 ? "99+" : count}
+    </span>
+  );
 }
 
 // --- Featured IDs editor ---
@@ -135,7 +172,6 @@ function FeaturedEditor({
           ))
         )}
       </div>
-
       <div className="flex gap-2">
         <Input
           ref={inputRef}
@@ -162,7 +198,6 @@ function FeaturedEditor({
           Add
         </Button>
       </div>
-
       <Button
         type="button"
         onClick={() => void handleSave()}
@@ -182,25 +217,22 @@ function FeaturedEditor({
 }
 
 // --- Reset password panel ---
-interface ResetPasswordPanelProps {
+function ResetPasswordPanel({
+  resetPassword,
+  isResetPending,
+}: {
   resetPassword: (
     oldPw: string,
     newPw: string,
   ) => Promise<{ ok: true } | { err: string }>;
   isResetPending: boolean;
-}
-
-function ResetPasswordPanel({
-  resetPassword,
-  isResetPending,
-}: ResetPasswordPanelProps) {
+}) {
   const [open, setOpen] = useState(false);
   const [oldPw, setOldPw] = useState("");
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-
   const strength = getPasswordStrength(newPw);
 
   const handleReset = async (e: React.FormEvent) => {
@@ -241,7 +273,6 @@ function ResetPasswordPanel({
         </span>
         {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
       </button>
-
       {open && (
         <form
           onSubmit={(e) => void handleReset(e)}
@@ -329,58 +360,413 @@ function ResetPasswordPanel({
   );
 }
 
-// --- Dashboard tab ---
+// --- Gradient Stat Card ---
+interface StatCardProps {
+  label: string;
+  value: string | number;
+  sub?: string;
+  icon: React.ReactNode;
+  gradient: string;
+  textClass?: string;
+}
+
+function StatCard({
+  label,
+  value,
+  sub,
+  icon,
+  gradient,
+  textClass = "text-primary",
+}: StatCardProps) {
+  return (
+    <div
+      className={`relative overflow-hidden rounded-xl p-5 ${gradient} border border-white/10`}
+    >
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-foreground/60 mb-1">
+            {label}
+          </p>
+          <p className={`font-display text-3xl font-bold ${textClass}`}>
+            {value}
+          </p>
+          {sub && <p className="text-xs text-foreground/50 mt-1">{sub}</p>}
+        </div>
+        <div className="w-10 h-10 rounded-xl bg-foreground/10 flex items-center justify-center">
+          {icon}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// --- Dashboard Tab ---
 function DashboardTab({ totalOrders }: { totalOrders: number }) {
-  const stats = [
+  const { data: stats, isLoading } = useAdminStats();
+  const { data: pendingPayments } = useAdminPendingPayments();
+  const { data: pendingWithdrawals } = useAdminPendingWithdrawals();
+
+  const pendingPmtCount =
+    pendingPayments?.filter((p) => p.status === "Pending").length ?? 0;
+  const pendingWdCount =
+    pendingWithdrawals?.filter((w) => w.status === "Pending").length ?? 0;
+
+  const displayOrders = stats?.totalOrders ?? totalOrders;
+  const displayUsers = stats?.totalUsers ?? 0;
+  const displayCommission = stats?.totalCommission ?? 0;
+  const displayRevenue = stats?.totalRevenue ?? 0;
+
+  const statCards: StatCardProps[] = [
     {
       label: "Total Orders",
-      value: totalOrders,
+      value: isLoading ? "—" : displayOrders.toLocaleString(),
       icon: <Package size={20} className="text-primary" />,
-      bg: "bg-primary/10",
+      gradient: "bg-gradient-to-br from-primary/15 to-primary/5",
+      textClass: "text-primary",
+    },
+    {
+      label: "Total Revenue",
+      value: isLoading ? "—" : `৳${displayRevenue.toLocaleString()}`,
+      icon: <TrendingUp size={20} className="text-secondary" />,
+      gradient: "bg-gradient-to-br from-secondary/15 to-secondary/5",
+      textClass: "text-secondary",
     },
     {
       label: "Commission Earned",
-      value: "—",
-      icon: <Star size={20} className="text-secondary" />,
-      bg: "bg-secondary/10",
+      value: isLoading ? "—" : `৳${displayCommission.toLocaleString()}`,
+      sub: "@ 10% rate",
+      icon: <BadgeDollarSign size={20} className="text-accent" />,
+      gradient: "bg-gradient-to-br from-accent/15 to-accent/5",
+      textClass: "text-accent",
     },
     {
       label: "Registered Users",
-      value: "—",
-      icon: <Users size={20} className="text-accent" />,
-      bg: "bg-accent/10",
+      value: isLoading ? "—" : displayUsers.toLocaleString(),
+      icon: <Users size={20} className="text-chart-3" />,
+      gradient: "bg-gradient-to-br from-chart-3/15 to-chart-3/5",
+      textClass: "text-chart-3",
     },
   ];
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {stats.map((s) => (
-          <Card key={s.label} className="border-border shadow-sm">
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-10 h-10 rounded-lg ${s.bg} flex items-center justify-center shrink-0`}
-                >
-                  {s.icon}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-2xl font-bold font-display text-foreground">
-                    {s.value}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {s.label}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {statCards.map((s) => (
+          <StatCard key={s.label} {...s} />
         ))}
       </div>
+
+      {/* Alert cards for pending actions */}
+      {(pendingPmtCount > 0 || pendingWdCount > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {pendingPmtCount > 0 && (
+            <div className="flex items-center gap-3 rounded-xl p-4 bg-gradient-to-r from-destructive/10 to-destructive/5 border border-destructive/20">
+              <AlertTriangle size={20} className="text-destructive shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  {pendingPmtCount} Payment{pendingPmtCount > 1 ? "s" : ""}{" "}
+                  Awaiting Verification
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Go to Payment Verification tab
+                </p>
+              </div>
+            </div>
+          )}
+          {pendingWdCount > 0 && (
+            <div className="flex items-center gap-3 rounded-xl p-4 bg-gradient-to-r from-secondary/10 to-secondary/5 border border-secondary/20">
+              <Wallet size={20} className="text-secondary shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  {pendingWdCount} Withdrawal{pendingWdCount > 1 ? "s" : ""}{" "}
+                  Pending Approval
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Go to Withdrawal Management tab
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <p className="text-sm text-muted-foreground">
         Welcome to the Admin Dashboard. Use the tabs above to manage orders,
-        approve admin role requests, and control featured items.
+        payments, commissions, approvals, and featured items.
       </p>
+    </div>
+  );
+}
+
+// --- Commission Dashboard Tab ---
+type PeriodType = "daily" | "weekly" | "monthly";
+
+function CommissionDashboardTab() {
+  const [period, setPeriod] = useState<PeriodType>("monthly");
+  const { data: summary, isLoading: summaryLoading } = useAdminStats();
+  const { data: chartData, isLoading: chartLoading } =
+    useCommissionByPeriod(period);
+  const { data: topSellers, isLoading: sellersLoading } = useTopSellers();
+  const { data: topProducts, isLoading: productsLoading } = useTopProducts();
+
+  const totalCommission = summary?.totalCommission ?? 0;
+  const totalRevenue = summary?.totalRevenue ?? 0;
+  const totalOrders = summary?.totalOrders ?? 0;
+
+  const periodButtons: { key: PeriodType; label: string }[] = [
+    { key: "daily", label: "Daily" },
+    { key: "weekly", label: "Weekly" },
+    { key: "monthly", label: "Monthly" },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Summary stat cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <StatCard
+          label="Total Commission"
+          value={summaryLoading ? "—" : `৳${totalCommission.toLocaleString()}`}
+          sub="System-wide, all sellers"
+          icon={<BadgeDollarSign size={20} className="text-primary" />}
+          gradient="bg-gradient-to-br from-primary/20 via-primary/10 to-accent/10"
+          textClass="text-primary"
+        />
+        <StatCard
+          label="Total Revenue"
+          value={summaryLoading ? "—" : `৳${totalRevenue.toLocaleString()}`}
+          sub="Before commission deduction"
+          icon={<TrendingUp size={20} className="text-secondary" />}
+          gradient="bg-gradient-to-br from-secondary/20 via-secondary/10 to-chart-3/10"
+          textClass="text-secondary"
+        />
+        <StatCard
+          label="Orders Processed"
+          value={summaryLoading ? "—" : totalOrders.toLocaleString()}
+          sub="@ 10% commission rate"
+          icon={<Package size={20} className="text-accent" />}
+          gradient="bg-gradient-to-br from-accent/20 via-accent/10 to-primary/10"
+          textClass="text-accent"
+        />
+      </div>
+
+      {/* Chart section */}
+      <Card className="border-border shadow-sm overflow-hidden">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <CardTitle className="text-base font-semibold">
+              Commission Trend
+            </CardTitle>
+            <div className="flex gap-1.5">
+              {periodButtons.map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setPeriod(key)}
+                  className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                    period === key
+                      ? "filter-badge-active bg-primary text-primary-foreground"
+                      : "filter-badge-inactive bg-muted text-muted-foreground hover:bg-muted/70"
+                  }`}
+                  data-ocid={`commission-period-${key}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-2">
+          {chartLoading ? (
+            <Skeleton className="h-52 w-full" />
+          ) : (
+            <ResponsiveContainer width="100%" height={210}>
+              <AreaChart
+                data={chartData}
+                margin={{ top: 4, right: 12, left: 0, bottom: 0 }}
+              >
+                <defs>
+                  <linearGradient
+                    id="commissionGrad"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop
+                      offset="5%"
+                      stopColor="oklch(0.52 0.28 199)"
+                      stopOpacity={0.35}
+                    />
+                    <stop
+                      offset="95%"
+                      stopColor="oklch(0.52 0.28 199)"
+                      stopOpacity={0}
+                    />
+                  </linearGradient>
+                  <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop
+                      offset="5%"
+                      stopColor="oklch(0.68 0.25 40)"
+                      stopOpacity={0.2}
+                    />
+                    <stop
+                      offset="95%"
+                      stopColor="oklch(0.68 0.25 40)"
+                      stopOpacity={0}
+                    />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="oklch(0.88 0 0 / 0.5)"
+                  vertical={false}
+                />
+                <XAxis
+                  dataKey="label"
+                  tick={{ fontSize: 11, fill: "oklch(0.50 0 0)" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "oklch(0.50 0 0)" }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(v: number) =>
+                    `৳${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`
+                  }
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "oklch(0.98 0 0)",
+                    border: "1px solid oklch(0.88 0 0)",
+                    borderRadius: "8px",
+                    fontSize: 12,
+                  }}
+                  formatter={(value: number, name: string) => [
+                    `৳${value.toLocaleString()}`,
+                    name === "commission" ? "Commission" : "Revenue",
+                  ]}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="revenue"
+                  stroke="oklch(0.68 0.25 40)"
+                  strokeWidth={1.5}
+                  fill="url(#revenueGrad)"
+                  dot={false}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="commission"
+                  stroke="oklch(0.52 0.28 199)"
+                  strokeWidth={2}
+                  fill="url(#commissionGrad)"
+                  dot={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+          <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-0.5 inline-block rounded-full bg-primary" />
+              Commission (10%)
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-0.5 inline-block rounded-full bg-secondary" />
+              Revenue
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Top Sellers + Top Products */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Top Sellers */}
+        <Card className="border-border shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Star size={15} className="text-secondary" />
+              Top Sellers
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-2">
+            {sellersLoading
+              ? [1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-12 w-full rounded-lg" />
+                ))
+              : (topSellers ?? []).slice(0, 5).map((seller, idx) => (
+                  <div
+                    key={seller.sellerId}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2 bg-muted/30 hover:bg-muted/50 transition-colors"
+                    data-ocid={`top-seller-${seller.sellerId}`}
+                  >
+                    <span className="w-6 text-xs font-bold text-muted-foreground">
+                      #{idx + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {seller.sellerName}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {seller.orders} orders
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold text-primary">
+                        ৳{seller.commission.toLocaleString()}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        commission
+                      </p>
+                    </div>
+                  </div>
+                ))}
+          </CardContent>
+        </Card>
+
+        {/* Top Products */}
+        <Card className="border-border shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Package size={15} className="text-accent" />
+              Top Products
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-2">
+            {productsLoading
+              ? [1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-12 w-full rounded-lg" />
+                ))
+              : (topProducts ?? []).slice(0, 5).map((product, idx) => (
+                  <div
+                    key={product.productId}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2 bg-muted/30 hover:bg-muted/50 transition-colors"
+                    data-ocid={`top-product-${product.productId}`}
+                  >
+                    <span className="w-6 text-xs font-bold text-muted-foreground">
+                      #{idx + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {product.productName}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {product.sold} sold
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold text-accent">
+                        ৳{product.commission.toLocaleString()}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        commission
+                      </p>
+                    </div>
+                  </div>
+                ))}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -437,7 +823,6 @@ function AllOrdersTab() {
           <Card key={order.id.toString()} className="border-border shadow-sm">
             <CardContent className="p-4">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                {/* Left info */}
                 <div className="flex-1 min-w-0 space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-mono text-muted-foreground">
@@ -457,11 +842,10 @@ function AllOrdersTab() {
                     <span title={order.userId.toText()}>{shortUserId}</span>
                     <span>{dateStr}</span>
                     <span className="font-medium text-foreground">
-                      ₱{order.total.toFixed(2)}
+                      ৳{order.total.toFixed(2)}
                     </span>
                   </div>
                 </div>
-                {/* Status changer */}
                 <div className="shrink-0">
                   <select
                     className="text-xs border border-border rounded-md px-2 py-1.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
@@ -587,7 +971,326 @@ function PendingApprovalsTab() {
   );
 }
 
-// --- Main Admin page ---
+// --- Payment Verification Tab ---
+const PAYMENT_METHOD_CONFIG = {
+  bkash: {
+    label: "bKash",
+    emoji: "💜",
+    color: "text-[oklch(var(--bkash))]",
+    bg: "bg-[oklch(var(--bkash)/0.08)] border-[oklch(var(--bkash)/0.3)]",
+  },
+  nagad: {
+    label: "Nagad",
+    emoji: "🟠",
+    color: "text-[oklch(var(--nagad))]",
+    bg: "bg-[oklch(var(--nagad)/0.08)] border-[oklch(var(--nagad)/0.3)]",
+  },
+} as const;
+
+const PAYMENT_STATUS_COLORS: Record<string, string> = {
+  Pending: "bg-secondary/15 text-secondary border-secondary/30",
+  Approved: "bg-chart-3/15 text-chart-3 border-chart-3/30",
+  Rejected: "bg-destructive/15 text-destructive border-destructive/30",
+};
+
+function PaymentVerificationTab() {
+  const { data: payments, isLoading } = useAdminPendingPayments();
+  const { mutateAsync: actionPayment, isPending: isActionPending } =
+    useApproveAdminPayment();
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-20 w-full rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  const pending = (payments ?? []).filter((p) => p.status === "Pending");
+
+  if (pending.length === 0) {
+    return (
+      <div
+        className="text-center py-12 text-muted-foreground"
+        data-ocid="admin-payments-empty"
+      >
+        <CheckCircle size={36} className="mx-auto mb-3 opacity-40" />
+        <p className="font-medium">No pending payments</p>
+        <p className="text-sm mt-1">
+          Payment submissions awaiting verification will appear here.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3" data-ocid="admin-payments-list">
+      {pending.map((payment) => {
+        const methodConf =
+          PAYMENT_METHOD_CONFIG[
+            payment.method as keyof typeof PAYMENT_METHOD_CONFIG
+          ] ?? PAYMENT_METHOD_CONFIG.bkash;
+        const dateStr = new Date(payment.createdAt).toLocaleDateString();
+        return (
+          <Card
+            key={payment.id}
+            className="border-border shadow-sm overflow-hidden"
+          >
+            <CardContent className="p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span
+                      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg border ${methodConf.bg}`}
+                    >
+                      <span>{methodConf.emoji}</span>
+                      <span className={methodConf.color}>
+                        {methodConf.label}
+                      </span>
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className={`text-xs border ${PAYMENT_STATUS_COLORS[payment.status] ?? ""}`}
+                    >
+                      {payment.status}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-0.5 text-xs">
+                    <span className="text-muted-foreground">
+                      Order:{" "}
+                      <span className="font-mono text-foreground">
+                        #{payment.orderId}
+                      </span>
+                    </span>
+                    <span className="text-muted-foreground">
+                      TxID:{" "}
+                      <span className="font-mono text-foreground">
+                        {payment.transactionId}
+                      </span>
+                    </span>
+                    <span className="text-muted-foreground">
+                      Date: <span className="text-foreground">{dateStr}</span>
+                    </span>
+                    <span className="font-bold text-primary text-sm col-span-2 sm:col-span-1">
+                      ৳{payment.amount.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                    disabled={isActionPending}
+                    data-ocid={`payment-reject-${payment.id}`}
+                    onClick={async () => {
+                      try {
+                        await actionPayment({
+                          id: payment.id,
+                          action: "reject",
+                        });
+                        toast.error("Payment rejected");
+                      } catch (e) {
+                        toast.error(
+                          e instanceof Error ? e.message : "Action failed",
+                        );
+                      }
+                    }}
+                  >
+                    <X size={14} />
+                    Reject
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-chart-3 text-chart-3-foreground hover:bg-chart-3/90"
+                    disabled={isActionPending}
+                    data-ocid={`payment-approve-${payment.id}`}
+                    onClick={async () => {
+                      try {
+                        await actionPayment({
+                          id: payment.id,
+                          action: "approve",
+                        });
+                        toast.success("Payment approved! Order confirmed.");
+                      } catch (e) {
+                        toast.error(
+                          e instanceof Error ? e.message : "Action failed",
+                        );
+                      }
+                    }}
+                  >
+                    {isActionPending ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <CheckCircle size={14} />
+                    )}
+                    Approve
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+// --- Withdrawal Management Tab ---
+const WITHDRAWAL_STATUS_COLORS: Record<string, string> = {
+  Pending: "bg-secondary/15 text-secondary border-secondary/30",
+  Approved: "bg-chart-3/15 text-chart-3 border-chart-3/30",
+  Rejected: "bg-destructive/15 text-destructive border-destructive/30",
+};
+
+function WithdrawalManagementTab() {
+  const { data: withdrawals, isLoading } = useAdminPendingWithdrawals();
+  const { mutateAsync: actionWithdrawal, isPending: isActionPending } =
+    useAdminWithdrawalAction();
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-20 w-full rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  const pending = (withdrawals ?? []).filter((w) => w.status === "Pending");
+
+  if (pending.length === 0) {
+    return (
+      <div
+        className="text-center py-12 text-muted-foreground"
+        data-ocid="admin-withdrawals-empty"
+      >
+        <ArrowDownCircle size={36} className="mx-auto mb-3 opacity-40" />
+        <p className="font-medium">No pending withdrawals</p>
+        <p className="text-sm mt-1">
+          Seller withdrawal requests will appear here.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3" data-ocid="admin-withdrawals-list">
+      {pending.map((req) => {
+        const methodConf =
+          PAYMENT_METHOD_CONFIG[
+            req.method as keyof typeof PAYMENT_METHOD_CONFIG
+          ] ?? PAYMENT_METHOD_CONFIG.bkash;
+        const dateStr = new Date(req.requestedAt).toLocaleDateString();
+        return (
+          <Card
+            key={req.id}
+            className="border-border shadow-sm overflow-hidden"
+          >
+            <CardContent className="p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-foreground">
+                      {req.sellerName}
+                    </span>
+                    <span
+                      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg border ${methodConf.bg}`}
+                    >
+                      <span>{methodConf.emoji}</span>
+                      <span className={methodConf.color}>
+                        {methodConf.label}
+                      </span>
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className={`text-xs border ${WITHDRAWAL_STATUS_COLORS[req.status] ?? ""}`}
+                    >
+                      {req.status}
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
+                    <span className="text-muted-foreground">
+                      Account:{" "}
+                      <span className="font-mono text-foreground">
+                        {req.accountNumber}
+                      </span>
+                    </span>
+                    <span className="text-muted-foreground">
+                      Requested:{" "}
+                      <span className="text-foreground">{dateStr}</span>
+                    </span>
+                    <span className="font-bold text-secondary text-sm">
+                      ৳{req.amount.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                    disabled={isActionPending}
+                    data-ocid={`withdrawal-reject-${req.id}`}
+                    onClick={async () => {
+                      try {
+                        await actionWithdrawal({
+                          id: req.id,
+                          action: "reject",
+                        });
+                        toast.error("Withdrawal request rejected");
+                      } catch (e) {
+                        toast.error(
+                          e instanceof Error ? e.message : "Action failed",
+                        );
+                      }
+                    }}
+                  >
+                    <X size={14} />
+                    Reject
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-chart-3 text-chart-3-foreground hover:bg-chart-3/90"
+                    disabled={isActionPending}
+                    data-ocid={`withdrawal-approve-${req.id}`}
+                    onClick={async () => {
+                      try {
+                        await actionWithdrawal({
+                          id: req.id,
+                          action: "approve",
+                        });
+                        toast.success(
+                          "Withdrawal approved! Seller will be paid.",
+                        );
+                      } catch (e) {
+                        toast.error(
+                          e instanceof Error ? e.message : "Action failed",
+                        );
+                      }
+                    }}
+                  >
+                    {isActionPending ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <CheckCircle size={14} />
+                    )}
+                    Approve
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+// ==================== MAIN ADMIN PAGE ====================
 export function AdminPage() {
   const {
     iiIsAuthenticated: isAuthenticated,
@@ -596,20 +1299,15 @@ export function AdminPage() {
   } = useAuth();
   const admin = useAdmin();
   const { orders } = useAdminOrders();
+  const { data: pendingPayments } = useAdminPendingPayments();
+  const { data: pendingWithdrawals } = useAdminPendingWithdrawals();
 
-  // Setup form state
   const [setupPw, setSetupPw] = useState("");
   const [setupConfirm, setSetupConfirm] = useState("");
   const [setupError, setSetupError] = useState("");
-
-  // Login form state
   const [loginPw, setLoginPw] = useState("");
   const [loginError, setLoginError] = useState("");
-
-  // Session password for re-auth on mutations
   const [sessionPw, setSessionPw] = useState("");
-
-  // Featured IDs local state per category
   const [featuredIds, setFeaturedIds] = useState<
     Record<AdminCategory, string[]>
   >({
@@ -621,7 +1319,16 @@ export function AdminPage() {
   const setupStrength = getPasswordStrength(setupPw);
   const { isVerified: adminIsVerified, getFeaturedByCategory } = admin;
 
-  // Load featured IDs once verified
+  const pendingPmtCount = (pendingPayments ?? []).filter(
+    (p) => p.status === "Pending",
+  ).length;
+  const pendingWdCount = (pendingWithdrawals ?? []).filter(
+    (w) => w.status === "Pending",
+  ).length;
+  const pendingOrdersCount = orders.filter(
+    (o) => o.status === OrderStatus.Pending,
+  ).length;
+
   useEffect(() => {
     if (!adminIsVerified) return;
     const load = async () => {
@@ -674,7 +1381,7 @@ export function AdminPage() {
     }
   };
 
-  // STATE 1: Internet Identity not logged in
+  // STATE 1: Not logged in with Internet Identity
   if (!isAuthenticated && !isInitializing) {
     return (
       <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12">
@@ -705,7 +1412,7 @@ export function AdminPage() {
     );
   }
 
-  // STATE 2: Authenticated + not verified + not set up → Create Admin Password
+  // STATE 2: Not set up
   if (
     isAuthenticated &&
     !admin.isVerified &&
@@ -797,7 +1504,7 @@ export function AdminPage() {
     );
   }
 
-  // STATE 3: Authenticated + not verified + already set up → Admin Login
+  // STATE 3: Setup but not verified → Admin Login
   if (isAuthenticated && !admin.isVerified && admin.isSetup) {
     return (
       <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12">
@@ -859,7 +1566,7 @@ export function AdminPage() {
     );
   }
 
-  // STATE 4: Verified → Full Admin Panel
+  // STATE 4: Verified → Full Admin Panel with 7 tabs
   if (admin.isVerified) {
     const categoryConfig = [
       { key: "shop" as AdminCategory, label: "Shop", color: "text-secondary" },
@@ -876,11 +1583,11 @@ export function AdminPage() {
     ];
 
     return (
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6 pb-20 sm:pb-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6 pb-20 sm:pb-8">
         {/* Panel header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
               <ShieldCheck size={20} className="text-primary" />
             </div>
             <div>
@@ -888,7 +1595,7 @@ export function AdminPage() {
                 Admin Panel
               </h1>
               <p className="text-sm text-muted-foreground">
-                Manage orders, approvals, and featured content
+                Commission, payments, orders & more
               </p>
             </div>
           </div>
@@ -907,33 +1614,83 @@ export function AdminPage() {
         <Card className="border-border shadow-sm">
           <CardContent className="pt-6">
             <Tabs defaultValue="dashboard">
-              <TabsList className="w-full mb-6 grid grid-cols-4">
+              {/* 7-tab layout: scroll on mobile */}
+              <TabsList className="w-full mb-6 flex overflow-x-auto gap-0.5 h-auto p-1 flex-nowrap">
                 <TabsTrigger
                   value="dashboard"
+                  className="flex-1 min-w-[80px] text-xs sm:text-sm"
                   data-ocid="admin-main-tab-dashboard"
                 >
-                  <Package size={14} className="mr-1.5 hidden sm:inline" />
+                  <Package
+                    size={13}
+                    className="mr-1 hidden sm:inline shrink-0"
+                  />
                   Dashboard
                 </TabsTrigger>
-                <TabsTrigger value="orders" data-ocid="admin-main-tab-orders">
+                <TabsTrigger
+                  value="commission"
+                  className="flex-1 min-w-[90px] text-xs sm:text-sm"
+                  data-ocid="admin-main-tab-commission"
+                >
+                  <BadgeDollarSign
+                    size={13}
+                    className="mr-1 hidden sm:inline shrink-0"
+                  />
+                  Commission
+                </TabsTrigger>
+                <TabsTrigger
+                  value="payments"
+                  className="flex-1 min-w-[90px] text-xs sm:text-sm flex items-center justify-center"
+                  data-ocid="admin-main-tab-payments"
+                >
+                  <CheckCircle
+                    size={13}
+                    className="mr-1 hidden sm:inline shrink-0"
+                  />
+                  Payments
+                  <NotificationBadge count={pendingPmtCount} />
+                </TabsTrigger>
+                <TabsTrigger
+                  value="withdrawals"
+                  className="flex-1 min-w-[100px] text-xs sm:text-sm flex items-center justify-center"
+                  data-ocid="admin-main-tab-withdrawals"
+                >
+                  <Wallet
+                    size={13}
+                    className="mr-1 hidden sm:inline shrink-0"
+                  />
+                  Withdrawals
+                  <NotificationBadge count={pendingWdCount} />
+                </TabsTrigger>
+                <TabsTrigger
+                  value="orders"
+                  className="flex-1 min-w-[70px] text-xs sm:text-sm flex items-center justify-center"
+                  data-ocid="admin-main-tab-orders"
+                >
                   <ClipboardList
-                    size={14}
-                    className="mr-1.5 hidden sm:inline"
+                    size={13}
+                    className="mr-1 hidden sm:inline shrink-0"
                   />
                   Orders
+                  <NotificationBadge count={pendingOrdersCount} />
                 </TabsTrigger>
                 <TabsTrigger
                   value="approvals"
+                  className="flex-1 min-w-[80px] text-xs sm:text-sm"
                   data-ocid="admin-main-tab-approvals"
                 >
-                  <UserCheck size={14} className="mr-1.5 hidden sm:inline" />
+                  <UserCheck
+                    size={13}
+                    className="mr-1 hidden sm:inline shrink-0"
+                  />
                   Approvals
                 </TabsTrigger>
                 <TabsTrigger
                   value="featured"
+                  className="flex-1 min-w-[75px] text-xs sm:text-sm"
                   data-ocid="admin-main-tab-featured"
                 >
-                  <Star size={14} className="mr-1.5 hidden sm:inline" />
+                  <Star size={13} className="mr-1 hidden sm:inline shrink-0" />
                   Featured
                 </TabsTrigger>
               </TabsList>
@@ -941,6 +1698,54 @@ export function AdminPage() {
               {/* Dashboard */}
               <TabsContent value="dashboard">
                 <DashboardTab totalOrders={orders.length} />
+              </TabsContent>
+
+              {/* Commission Dashboard */}
+              <TabsContent value="commission">
+                <div className="space-y-4">
+                  <div>
+                    <h2 className="text-base font-semibold text-foreground">
+                      Commission Dashboard
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      System-wide 10% commission across all sellers and
+                      products.
+                    </p>
+                  </div>
+                  <CommissionDashboardTab />
+                </div>
+              </TabsContent>
+
+              {/* Payment Verification */}
+              <TabsContent value="payments">
+                <div className="space-y-4">
+                  <div>
+                    <h2 className="text-base font-semibold text-foreground">
+                      Payment Verification
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Approve or reject bKash/Nagad payment submissions from
+                      customers.
+                    </p>
+                  </div>
+                  <PaymentVerificationTab />
+                </div>
+              </TabsContent>
+
+              {/* Withdrawal Management */}
+              <TabsContent value="withdrawals">
+                <div className="space-y-4">
+                  <div>
+                    <h2 className="text-base font-semibold text-foreground">
+                      Withdrawal Management
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Review and process seller withdrawal requests via
+                      bKash/Nagad.
+                    </p>
+                  </div>
+                  <WithdrawalManagementTab />
+                </div>
               </TabsContent>
 
               {/* All Orders */}
@@ -980,7 +1785,7 @@ export function AdminPage() {
                     <CardTitle className="text-base">Featured Items</CardTitle>
                     <p className="text-sm text-muted-foreground">
                       Control which items appear in the Featured &amp; Trending
-                      sections. Changes take effect immediately.
+                      sections.
                     </p>
                   </div>
                   <Tabs defaultValue="shop">
@@ -1022,7 +1827,7 @@ export function AdminPage() {
           </CardContent>
         </Card>
 
-        {/* Reset password section */}
+        {/* Reset password */}
         <Card className="border-border shadow-sm">
           <CardContent className="pt-6">
             <ResetPasswordPanel
@@ -1035,7 +1840,7 @@ export function AdminPage() {
     );
   }
 
-  // Loading / initializing state
+  // Loading state
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center">
       <Loader2 size={32} className="animate-spin text-muted-foreground" />

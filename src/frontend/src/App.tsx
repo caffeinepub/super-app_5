@@ -16,6 +16,7 @@ import { ProductDetailsPage } from "./pages/ProductDetails";
 import { ServicePage } from "./pages/Service";
 import { ShopPage } from "./pages/Shop";
 import { SignupPage } from "./pages/Signup";
+import { WalletPage } from "./pages/Wallet";
 
 const rootRoute = createRootRoute({
   component: () => (
@@ -85,6 +86,12 @@ const checkoutRoute = createRoute({
   component: CheckoutPage,
 });
 
+const walletRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/wallet",
+  component: WalletPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   shopRoute,
@@ -96,6 +103,7 @@ const routeTree = rootRoute.addChildren([
   signupRoute,
   cartRoute,
   checkoutRoute,
+  walletRoute,
 ]);
 
 const router = createRouter({ routeTree });

@@ -33,16 +33,98 @@ export const Order = IDL.Record({
   'date' : Timestamp,
   'items' : IDL.Vec(OrderItem),
 });
+export const CommissionSummary = IDL.Record({
+  'totalCommission' : IDL.Float64,
+  'topProducts' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64)),
+  'topSellers' : IDL.Vec(IDL.Tuple(UserId, IDL.Float64)),
+  'byPeriod' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64)),
+});
+export const PaymentStatus = IDL.Variant({
+  'Approved' : IDL.Null,
+  'Rejected' : IDL.Null,
+  'Pending' : IDL.Null,
+});
+export const PaymentMethod = IDL.Variant({
+  'Nagad' : IDL.Null,
+  'bKash' : IDL.Null,
+});
+export const PaymentRecord = IDL.Record({
+  'id' : IDL.Nat,
+  'status' : PaymentStatus,
+  'method' : PaymentMethod,
+  'sellerEarnings' : IDL.Float64,
+  'userId' : UserId,
+  'submittedAt' : Timestamp,
+  'commission' : IDL.Float64,
+  'reviewedAt' : IDL.Opt(Timestamp),
+  'orderId' : IDL.Nat,
+  'amount' : IDL.Float64,
+  'transactionId' : IDL.Text,
+});
+export const SellerWallet = IDL.Record({
+  'pendingWithdrawal' : IDL.Float64,
+  'totalWithdrawn' : IDL.Float64,
+  'totalEarnings' : IDL.Float64,
+  'sellerId' : UserId,
+});
 export const UserProfile = IDL.Record({ 'displayName' : IDL.Text });
+export const WithdrawStatus = IDL.Variant({
+  'Approved' : IDL.Null,
+  'Rejected' : IDL.Null,
+  'Pending' : IDL.Null,
+});
+export const WithdrawRequest = IDL.Record({
+  'id' : IDL.Nat,
+  'status' : WithdrawStatus,
+  'method' : PaymentMethod,
+  'reviewedAt' : IDL.Opt(Timestamp),
+  'sellerId' : UserId,
+  'accountNumber' : IDL.Text,
+  'amount' : IDL.Float64,
+  'requestedAt' : Timestamp,
+});
+export const CommissionRecord = IDL.Record({
+  'id' : IDL.Nat,
+  'rate' : IDL.Float64,
+  'productId' : IDL.Text,
+  'orderId' : IDL.Nat,
+  'timestamp' : Timestamp,
+  'sellerId' : UserId,
+  'amount' : IDL.Float64,
+});
 
 export const idlService = IDL.Service({
+  'approvePayment' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+  'approveWithdrawal' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'assignRole' : IDL.Func(
       [UserId, UserRole],
       [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
       [],
     ),
   'createOrder' : IDL.Func([IDL.Vec(OrderItem)], [Order], []),
+  'getAdminStats' : IDL.Func(
+      [],
+      [
+        IDL.Record({
+          'newOrders' : IDL.Nat,
+          'pendingPayments' : IDL.Nat,
+          'pendingWithdrawals' : IDL.Nat,
+        }),
+      ],
+      ['query'],
+    ),
   'getAllOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+  'getCommissionByMonth' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64))],
+      ['query'],
+    ),
+  'getCommissionByPeriod' : IDL.Func(
+      [IDL.Text],
+      [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64))],
+      ['query'],
+    ),
+  'getCommissionSummary' : IDL.Func([], [CommissionSummary], ['query']),
   'getFeaturedIds' : IDL.Func([IDL.Text], [IDL.Vec(IDL.Text)], ['query']),
   'getFeaturedIdsByCategory' : IDL.Func(
       [IDL.Text],
@@ -52,12 +134,43 @@ export const idlService = IDL.Service({
   'getMyOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
   'getMyPrincipal' : IDL.Func([], [IDL.Text], ['query']),
   'getMyRole' : IDL.Func([], [UserRole], ['query']),
+  'getPayment' : IDL.Func([IDL.Nat], [IDL.Opt(PaymentRecord)], ['query']),
+  'getSellerWallet' : IDL.Func([UserId], [IDL.Opt(SellerWallet)], ['query']),
+  'getTopProducts' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64))],
+      ['query'],
+    ),
+  'getTopSellers' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Vec(IDL.Tuple(UserId, IDL.Float64))],
+      ['query'],
+    ),
   'getUserProfile' : IDL.Func([UserId], [IDL.Opt(UserProfile)], ['query']),
   'getUserRole' : IDL.Func([UserId], [UserRole], ['query']),
   'isAdminSetup' : IDL.Func([], [IDL.Bool], ['query']),
+  'listAllPayments' : IDL.Func([], [IDL.Vec(PaymentRecord)], ['query']),
+  'listAllWithdrawals' : IDL.Func([], [IDL.Vec(WithdrawRequest)], ['query']),
+  'listCommissions' : IDL.Func([], [IDL.Vec(CommissionRecord)], ['query']),
+  'listPendingPayments' : IDL.Func([], [IDL.Vec(PaymentRecord)], ['query']),
+  'listPendingWithdrawals' : IDL.Func(
+      [],
+      [IDL.Vec(WithdrawRequest)],
+      ['query'],
+    ),
+  'myPayments' : IDL.Func([], [IDL.Vec(PaymentRecord)], ['query']),
+  'myWallet' : IDL.Func([], [SellerWallet], ['query']),
+  'myWithdrawals' : IDL.Func([], [IDL.Vec(WithdrawRequest)], ['query']),
+  'rejectPayment' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+  'rejectWithdrawal' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'requestAdminRole' : IDL.Func(
       [],
       [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+      [],
+    ),
+  'requestWithdrawal' : IDL.Func(
+      [IDL.Float64, PaymentMethod, IDL.Text],
+      [IDL.Nat],
       [],
     ),
   'resetAdminPassword' : IDL.Func(
@@ -69,6 +182,11 @@ export const idlService = IDL.Service({
   'setupAdminPassword' : IDL.Func(
       [IDL.Text],
       [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
+  'submitPayment' : IDL.Func(
+      [IDL.Nat, PaymentMethod, IDL.Text, IDL.Float64],
+      [IDL.Nat],
       [],
     ),
   'updateFeaturedIds' : IDL.Func(
@@ -112,16 +230,95 @@ export const idlFactory = ({ IDL }) => {
     'date' : Timestamp,
     'items' : IDL.Vec(OrderItem),
   });
+  const CommissionSummary = IDL.Record({
+    'totalCommission' : IDL.Float64,
+    'topProducts' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64)),
+    'topSellers' : IDL.Vec(IDL.Tuple(UserId, IDL.Float64)),
+    'byPeriod' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64)),
+  });
+  const PaymentStatus = IDL.Variant({
+    'Approved' : IDL.Null,
+    'Rejected' : IDL.Null,
+    'Pending' : IDL.Null,
+  });
+  const PaymentMethod = IDL.Variant({ 'Nagad' : IDL.Null, 'bKash' : IDL.Null });
+  const PaymentRecord = IDL.Record({
+    'id' : IDL.Nat,
+    'status' : PaymentStatus,
+    'method' : PaymentMethod,
+    'sellerEarnings' : IDL.Float64,
+    'userId' : UserId,
+    'submittedAt' : Timestamp,
+    'commission' : IDL.Float64,
+    'reviewedAt' : IDL.Opt(Timestamp),
+    'orderId' : IDL.Nat,
+    'amount' : IDL.Float64,
+    'transactionId' : IDL.Text,
+  });
+  const SellerWallet = IDL.Record({
+    'pendingWithdrawal' : IDL.Float64,
+    'totalWithdrawn' : IDL.Float64,
+    'totalEarnings' : IDL.Float64,
+    'sellerId' : UserId,
+  });
   const UserProfile = IDL.Record({ 'displayName' : IDL.Text });
+  const WithdrawStatus = IDL.Variant({
+    'Approved' : IDL.Null,
+    'Rejected' : IDL.Null,
+    'Pending' : IDL.Null,
+  });
+  const WithdrawRequest = IDL.Record({
+    'id' : IDL.Nat,
+    'status' : WithdrawStatus,
+    'method' : PaymentMethod,
+    'reviewedAt' : IDL.Opt(Timestamp),
+    'sellerId' : UserId,
+    'accountNumber' : IDL.Text,
+    'amount' : IDL.Float64,
+    'requestedAt' : Timestamp,
+  });
+  const CommissionRecord = IDL.Record({
+    'id' : IDL.Nat,
+    'rate' : IDL.Float64,
+    'productId' : IDL.Text,
+    'orderId' : IDL.Nat,
+    'timestamp' : Timestamp,
+    'sellerId' : UserId,
+    'amount' : IDL.Float64,
+  });
   
   return IDL.Service({
+    'approvePayment' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+    'approveWithdrawal' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'assignRole' : IDL.Func(
         [UserId, UserRole],
         [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
         [],
       ),
     'createOrder' : IDL.Func([IDL.Vec(OrderItem)], [Order], []),
+    'getAdminStats' : IDL.Func(
+        [],
+        [
+          IDL.Record({
+            'newOrders' : IDL.Nat,
+            'pendingPayments' : IDL.Nat,
+            'pendingWithdrawals' : IDL.Nat,
+          }),
+        ],
+        ['query'],
+      ),
     'getAllOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+    'getCommissionByMonth' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64))],
+        ['query'],
+      ),
+    'getCommissionByPeriod' : IDL.Func(
+        [IDL.Text],
+        [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64))],
+        ['query'],
+      ),
+    'getCommissionSummary' : IDL.Func([], [CommissionSummary], ['query']),
     'getFeaturedIds' : IDL.Func([IDL.Text], [IDL.Vec(IDL.Text)], ['query']),
     'getFeaturedIdsByCategory' : IDL.Func(
         [IDL.Text],
@@ -131,12 +328,43 @@ export const idlFactory = ({ IDL }) => {
     'getMyOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
     'getMyPrincipal' : IDL.Func([], [IDL.Text], ['query']),
     'getMyRole' : IDL.Func([], [UserRole], ['query']),
+    'getPayment' : IDL.Func([IDL.Nat], [IDL.Opt(PaymentRecord)], ['query']),
+    'getSellerWallet' : IDL.Func([UserId], [IDL.Opt(SellerWallet)], ['query']),
+    'getTopProducts' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64))],
+        ['query'],
+      ),
+    'getTopSellers' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Vec(IDL.Tuple(UserId, IDL.Float64))],
+        ['query'],
+      ),
     'getUserProfile' : IDL.Func([UserId], [IDL.Opt(UserProfile)], ['query']),
     'getUserRole' : IDL.Func([UserId], [UserRole], ['query']),
     'isAdminSetup' : IDL.Func([], [IDL.Bool], ['query']),
+    'listAllPayments' : IDL.Func([], [IDL.Vec(PaymentRecord)], ['query']),
+    'listAllWithdrawals' : IDL.Func([], [IDL.Vec(WithdrawRequest)], ['query']),
+    'listCommissions' : IDL.Func([], [IDL.Vec(CommissionRecord)], ['query']),
+    'listPendingPayments' : IDL.Func([], [IDL.Vec(PaymentRecord)], ['query']),
+    'listPendingWithdrawals' : IDL.Func(
+        [],
+        [IDL.Vec(WithdrawRequest)],
+        ['query'],
+      ),
+    'myPayments' : IDL.Func([], [IDL.Vec(PaymentRecord)], ['query']),
+    'myWallet' : IDL.Func([], [SellerWallet], ['query']),
+    'myWithdrawals' : IDL.Func([], [IDL.Vec(WithdrawRequest)], ['query']),
+    'rejectPayment' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+    'rejectWithdrawal' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'requestAdminRole' : IDL.Func(
         [],
         [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+        [],
+      ),
+    'requestWithdrawal' : IDL.Func(
+        [IDL.Float64, PaymentMethod, IDL.Text],
+        [IDL.Nat],
         [],
       ),
     'resetAdminPassword' : IDL.Func(
@@ -148,6 +376,11 @@ export const idlFactory = ({ IDL }) => {
     'setupAdminPassword' : IDL.Func(
         [IDL.Text],
         [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
+    'submitPayment' : IDL.Func(
+        [IDL.Nat, PaymentMethod, IDL.Text, IDL.Float64],
+        [IDL.Nat],
         [],
       ),
     'updateFeaturedIds' : IDL.Func(
