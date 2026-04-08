@@ -1,0 +1,26 @@
+{
+  "overview": "Super App is a full-stack mobile-first web application with Shop, Delivery, and Service categories. Features include product browsing, cart management, cart checkout with order placement, order history tracking, service booking, and a full Admin Panel with featured items management, user roles, and order approvals.",
+  "features": [
+    "Product browsing with cart and cart checkout flow",
+    "Order placement that appears immediately in order history",
+    "Delivery tracking with order status (Pending/Ongoing/Delivered)",
+    "Service booking page",
+    "Email/password login and signup for regular users",
+    "Admin panel with dashboard, order management, product/service lists, featured items, and role approvals",
+    "Internet Identity login for admin access",
+    "Role-based access control (Customer, Seller, Admin)"
+  ],
+  "category": "ecommerce",
+  "tags": [
+    "shop",
+    "cart",
+    "checkout",
+    "orders",
+    "delivery",
+    "services",
+    "admin",
+    "ecommerce",
+    "mobile-first"
+  ],
+  "last_updated": "2026-04-08T16:28:09.317Z"
+}

@@ -1,0 +1,320 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-display: "Bricolage Grotesque", sans-serif;
+    --font-body: "DM Sans", sans-serif;
+    --font-mono: "Geist Mono", monospace;
+    --radius: 0.75rem;
+
+    --background: 0.97 0 0;
+    --foreground: 0.15 0 0;
+    --card: 0.99 0 0;
+    --card-foreground: 0.15 0 0;
+    --popover: 0.99 0 0;
+    --popover-foreground: 0.15 0 0;
+
+    --primary: 0.54 0.24 199;
+    --primary-foreground: 0.98 0 0;
+
+    --secondary: 0.65 0.22 40;
+    --secondary-foreground: 0.98 0 0;
+    --muted: 0.92 0 0;
+    --muted-foreground: 0.45 0 0;
+
+    --accent: 0.52 0.22 305;
+    --accent-foreground: 0.98 0 0;
+
+    --destructive: 0.55 0.22 25;
+    --destructive-foreground: 0.98 0 0;
+
+    --border: 0.92 0 0;
+    --input: 0.94 0 0;
+    --ring: 0.54 0.24 199;
+
+    --chart-1: 0.65 0.22 40;
+    --chart-2: 0.52 0.22 305;
+    --chart-3: 0.68 0.21 142;
+    --chart-4: 0.54 0.24 199;
+    --chart-5: 0.45 0.18 250;
+
+    --sidebar: 0.98 0 0;
+    --sidebar-foreground: 0.15 0 0;
+    --sidebar-primary: 0.54 0.24 199;
+    --sidebar-primary-foreground: 0.98 0 0;
+    --sidebar-accent: 0.92 0 0;
+    --sidebar-accent-foreground: 0.25 0 0;
+    --sidebar-border: 0.92 0 0;
+    --sidebar-ring: 0.54 0.24 199;
+  }
+
+  .dark {
+    --background: 0.13 0 0;
+    --foreground: 0.95 0 0;
+    --card: 0.16 0 0;
+    --card-foreground: 0.95 0 0;
+    --popover: 0.2 0 0;
+    --popover-foreground: 0.95 0 0;
+
+    --primary: 0.6 0.25 199;
+    --primary-foreground: 0.13 0 0;
+
+    --secondary: 0.72 0.23 40;
+    --secondary-foreground: 0.13 0 0;
+    --muted: 0.22 0 0;
+    --muted-foreground: 0.6 0 0;
+
+    --accent: 0.58 0.23 305;
+    --accent-foreground: 0.13 0 0;
+
+    --destructive: 0.65 0.19 22;
+    --destructive-foreground: 0.13 0 0;
+
+    --border: 0.25 0 0;
+    --input: 0.22 0 0;
+    --ring: 0.6 0.25 199;
+
+    --chart-1: 0.72 0.23 40;
+    --chart-2: 0.58 0.23 305;
+    --chart-3: 0.72 0.22 142;
+    --chart-4: 0.6 0.25 199;
+    --chart-5: 0.55 0.2 250;
+
+    --sidebar: 0.16 0 0;
+    --sidebar-foreground: 0.95 0 0;
+    --sidebar-primary: 0.6 0.25 199;
+    --sidebar-primary-foreground: 0.13 0 0;
+    --sidebar-accent: 0.22 0 0;
+    --sidebar-accent-foreground: 0.85 0 0;
+    --sidebar-border: 0.25 0 0;
+    --sidebar-ring: 0.6 0.25 199;
+  }
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+}
+
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("/assets/fonts/BricolageGrotesque.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "DM Sans";
+  src: url("/assets/fonts/DMSans.woff2") format("woff2");
+  font-weight: 400 500 600 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/assets/fonts/GeistMono.woff2") format("woff2");
+  font-weight: 400 500;
+  font-display: swap;
+}
+
+@layer utilities {
+  .transition-smooth {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .category-card {
+    @apply rounded-lg border border-border bg-card p-6 transition-smooth hover:shadow-md hover:border-primary/40;
+  }
+
+  .category-icon {
+    @apply mb-3 text-3xl;
+  }
+
+  .search-input {
+    @apply w-full rounded-lg border border-border bg-input px-4 py-3 pl-11 font-body text-foreground placeholder-muted-foreground transition-smooth focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none;
+  }
+
+  /* User account & authentication */
+  .header-user-button {
+    @apply inline-flex items-center gap-2 rounded-lg px-3 py-2 transition-smooth hover:bg-muted/30 active:bg-muted/50;
+  }
+
+  .user-avatar {
+    @apply h-8 w-8 rounded-full border-2 border-primary/30 object-cover;
+  }
+
+  .welcome-message {
+    @apply font-display text-lg font-bold text-foreground;
+  }
+
+  /* Live search & results */
+  .search-results-dropdown {
+    @apply absolute top-full left-0 right-0 mt-2 rounded-lg border border-border bg-card shadow-md z-50;
+  }
+
+  .search-result-item {
+    @apply px-4 py-3 transition-smooth hover:bg-muted/50 cursor-pointer border-b border-border last:border-b-0;
+  }
+
+  .search-result-badge {
+    @apply inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium;
+  }
+
+  .badge-shop {
+    @apply bg-secondary/20 text-secondary;
+  }
+
+  .badge-delivery {
+    @apply bg-accent/20 text-accent;
+  }
+
+  .badge-service {
+    @apply bg-chart-3/20 text-chart-3;
+  }
+
+  /* Featured/trending sections */
+  .featured-section {
+    @apply rounded-lg border-2 border-primary/20 bg-primary/5 p-6 mb-6;
+  }
+
+  .featured-badge {
+    @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-semibold bg-secondary text-secondary-foreground mb-3;
+  }
+
+  .trending-indicator {
+    @apply flex items-center gap-1 text-sm font-medium text-secondary;
+  }
+
+  .featured-title {
+    @apply font-display text-xl font-bold text-foreground;
+  }
+
+  .featured-description {
+    @apply text-sm text-muted-foreground mt-2;
+  }
+
+  /* Personalization elements */
+  .personalized-greeting {
+    @apply bg-gradient-to-r from-primary/10 to-secondary/10 rounded-lg p-4 border border-primary/20 mb-6;
+  }
+
+  .greeting-text {
+    @apply font-display text-2xl font-bold text-foreground;
+  }
+
+  .greeting-subtext {
+    @apply text-sm text-muted-foreground mt-1;
+  }
+
+  /* Product Grid & Cards */
+  .product-grid {
+    @apply grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4;
+  }
+
+  .product-card {
+    @apply flex flex-col rounded-lg border border-border bg-card overflow-hidden transition-smooth hover:shadow-md hover:border-primary/40;
+  }
+
+  .product-image {
+    @apply aspect-square object-cover bg-muted;
+  }
+
+  .product-card-content {
+    @apply p-4 flex flex-col flex-1;
+  }
+
+  .product-name {
+    @apply font-display text-sm font-bold text-foreground line-clamp-2;
+  }
+
+  .product-price {
+    @apply font-display text-lg font-bold text-primary mt-2;
+  }
+
+  .product-price-original {
+    @apply text-sm text-muted-foreground line-through;
+  }
+
+  /* Stock Status Badges */
+  .stock-in {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold bg-chart-3/20 text-chart-3 mt-2;
+  }
+
+  .stock-low {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold bg-secondary/20 text-secondary mt-2;
+  }
+
+  .stock-out {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold bg-muted/50 text-muted-foreground mt-2;
+  }
+
+  /* Product Details Page */
+  .product-details-container {
+    @apply flex flex-col lg:flex-row gap-6 lg:gap-8;
+  }
+
+  .product-image-section {
+    @apply w-full lg:w-1/2;
+  }
+
+  .product-image-hero {
+    @apply w-full aspect-square object-cover bg-muted rounded-lg border border-border;
+  }
+
+  .product-thumbnails {
+    @apply flex gap-2 mt-3;
+  }
+
+  .product-thumbnail {
+    @apply w-16 h-16 object-cover rounded border border-border cursor-pointer transition-smooth hover:border-primary;
+  }
+
+  .product-info-section {
+    @apply w-full lg:w-1/2 flex flex-col;
+  }
+
+  .product-details-title {
+    @apply font-display text-2xl font-bold text-foreground;
+  }
+
+  .product-details-price {
+    @apply font-display text-3xl font-bold text-primary mt-2;
+  }
+
+  .product-rating {
+    @apply flex items-center gap-1 mt-4 text-sm;
+  }
+
+  .product-description {
+    @apply text-sm text-muted-foreground mt-4 leading-relaxed;
+  }
+
+  .product-details-badge {
+    @apply inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold mt-4 w-fit;
+  }
+
+  .breadcrumb {
+    @apply flex items-center gap-2 text-xs text-muted-foreground mb-4;
+  }
+
+  .breadcrumb-separator {
+    @apply text-muted-foreground/50;
+  }
+
+  /* Add to Cart Button - Sticky Mobile */
+  .add-to-cart-button {
+    @apply w-full px-4 py-3 rounded-lg font-semibold text-primary-foreground bg-primary transition-smooth hover:bg-primary/90 active:bg-primary/80 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .add-to-cart-sticky {
+    @apply fixed bottom-0 left-0 right-0 px-4 py-3 bg-card border-t border-border shadow-md lg:static lg:w-full lg:shadow-none lg:border-t-0 lg:px-0 lg:py-4;
+  }
+
+  .cart-badge {
+    @apply inline-flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs font-bold w-5 h-5;
+  }
+}

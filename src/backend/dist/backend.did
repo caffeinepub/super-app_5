@@ -1,0 +1,71 @@
+type UserRole = 
+ variant {
+   Admin;
+   Customer;
+   Seller;
+ };
+type UserProfile = record {displayName: text;};
+type UserId = principal;
+type Timestamp = int;
+type OrderStatus = 
+ variant {
+   Delivered;
+   Ongoing;
+   Pending;
+ };
+type OrderItem = 
+ record {
+   name: text;
+   price: float64;
+   qty: nat;
+ };
+type Order = 
+ record {
+   date: Timestamp;
+   id: nat;
+   items: vec OrderItem;
+   status: OrderStatus;
+   total: float64;
+   userId: UserId;
+ };
+service : {
+  assignRole: (userId: UserId, role: UserRole) -> (variant {
+                                                     err: text;
+                                                     ok;
+                                                   });
+  createOrder: (items: vec OrderItem) -> (Order);
+  getAllOrders: () -> (vec Order) query;
+  getFeaturedIds: (category: text) -> (vec text) query;
+  getFeaturedIdsByCategory: (category: text) -> (vec text) query;
+  getMyOrders: () -> (vec Order) query;
+  getMyPrincipal: () -> (text) query;
+  getMyRole: () -> (UserRole) query;
+  getUserProfile: (userId: UserId) -> (opt UserProfile) query;
+  getUserRole: (userId: UserId) -> (UserRole) query;
+  isAdminSetup: () -> (bool) query;
+  requestAdminRole: () -> (variant {
+                             err: text;
+                             ok: text;
+                           });
+  resetAdminPassword: (oldHash: text, newHash: text) ->
+   (variant {
+      err: text;
+      ok;
+    });
+  setUserProfile: (displayName: text) -> ();
+  setupAdminPassword: (passwordHash: text) -> (variant {
+                                                 err: text;
+                                                 ok;
+                                               });
+  updateFeaturedIds: (category: text, ids: vec text, passwordHash: text) ->
+   (variant {
+      err: text;
+      ok;
+    });
+  updateOrderStatus: (orderId: nat, status: OrderStatus) ->
+   (variant {
+      err: text;
+      ok;
+    });
+  verifyAdminPassword: (passwordHash: text) -> (bool) query;
+}

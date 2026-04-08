@@ -1,0 +1,57 @@
+// Version: 1.0.0
+type Category__202766044 = Category__936342486;
+type Category__936342486 = Text;
+type Data__791452850<K, V> =
+  {var count : Nat__490723111; kvs : [var ?(K, V)]};
+type Internal__8484328<K, V> =
+  {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
+type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
+type Nat__490723111 = Nat__920180692;
+type Nat__920180692 = Nat;
+type Node__46230540<K, V> =
+  {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
+type OrderItem__241319351 = {name : Text; price : Float; qty : Nat};
+type OrderStatus__272730104 = {#Delivered; #Ongoing; #Pending};
+type Order__141779993 =
+  {
+    date : Timestamp__813860109;
+    id : Nat;
+    items : [OrderItem__241319351];
+    status : OrderStatus__272730104;
+    total : Float;
+    userId : UserId__41638867
+  };
+type Timestamp__301639476 = Int;
+type Timestamp__813860109 = Timestamp__301639476;
+type UserId__158757552 = Principal;
+type UserId__164923593 = UserId__158757552;
+type UserId__41638867 = UserId__158757552;
+type UserId__423380635 = UserId__158757552;
+type UserProfile__190304746 = {displayName : Text};
+type UserProfile__826653903 = UserProfile__190304746;
+type UserRole__655227432 = {#Admin; #Customer; #Seller};
+actor {
+  stable adminState : {var adminOwner : ?Principal; var passwordHash : ?Text};
+  stable featured :
+    {
+      var root : Node__46230540<Category__202766044, [Text]>;
+      var size : Nat__490723111
+    };
+  stable var nextOrderId : Nat;
+  stable orders :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?Order__141779993]];
+      var elementIndex : Nat__490723111
+    };
+  stable profiles :
+    {
+      var root : Node__46230540<UserId__423380635, UserProfile__826653903>;
+      var size : Nat__490723111
+    };
+  stable roles :
+    {
+      var root : Node__46230540<UserId__164923593, UserRole__655227432>;
+      var size : Nat__490723111
+    }
+};
