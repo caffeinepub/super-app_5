@@ -607,92 +607,103 @@ function CommissionDashboardTab() {
           {chartLoading ? (
             <Skeleton className="h-52 w-full" />
           ) : (
-            <ResponsiveContainer width="100%" height={210}>
-              <AreaChart
-                data={chartData}
-                margin={{ top: 4, right: 12, left: 0, bottom: 0 }}
-              >
-                <defs>
-                  <linearGradient
-                    id="commissionGrad"
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
-                  >
-                    <stop
-                      offset="5%"
-                      stopColor="oklch(0.52 0.28 199)"
-                      stopOpacity={0.35}
-                    />
-                    <stop
-                      offset="95%"
-                      stopColor="oklch(0.52 0.28 199)"
-                      stopOpacity={0}
-                    />
-                  </linearGradient>
-                  <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop
-                      offset="5%"
-                      stopColor="oklch(0.68 0.25 40)"
-                      stopOpacity={0.2}
-                    />
-                    <stop
-                      offset="95%"
-                      stopColor="oklch(0.68 0.25 40)"
-                      stopOpacity={0}
-                    />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="oklch(0.88 0 0 / 0.5)"
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="label"
-                  tick={{ fontSize: 11, fill: "oklch(0.50 0 0)" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: "oklch(0.50 0 0)" }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v: number) =>
-                    `৳${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`
-                  }
-                />
-                <Tooltip
-                  contentStyle={{
-                    background: "oklch(0.98 0 0)",
-                    border: "1px solid oklch(0.88 0 0)",
-                    borderRadius: "8px",
-                    fontSize: 12,
-                  }}
-                  formatter={(value: number, name: string) => [
-                    `৳${value.toLocaleString()}`,
-                    name === "commission" ? "Commission" : "Revenue",
-                  ]}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="revenue"
-                  stroke="oklch(0.68 0.25 40)"
-                  strokeWidth={1.5}
-                  fill="url(#revenueGrad)"
-                  dot={false}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="commission"
-                  stroke="oklch(0.52 0.28 199)"
-                  strokeWidth={2}
-                  fill="url(#commissionGrad)"
-                  dot={false}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            <div style={{ width: "100%", height: 210, minHeight: 210 }}>
+              <ResponsiveContainer width="100%" height={210}>
+                <AreaChart
+                  data={chartData}
+                  margin={{ top: 4, right: 12, left: 0, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient
+                      id="commissionGrad"
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop
+                        offset="5%"
+                        stopColor="oklch(0.52 0.28 199)"
+                        stopOpacity={0.35}
+                      />
+                      <stop
+                        offset="95%"
+                        stopColor="oklch(0.52 0.28 199)"
+                        stopOpacity={0}
+                      />
+                    </linearGradient>
+                    <linearGradient
+                      id="revenueGrad"
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop
+                        offset="5%"
+                        stopColor="oklch(0.68 0.25 40)"
+                        stopOpacity={0.2}
+                      />
+                      <stop
+                        offset="95%"
+                        stopColor="oklch(0.68 0.25 40)"
+                        stopOpacity={0}
+                      />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid
+                    strokeDasharray="0"
+                    stroke="oklch(0.88 0 0 / 0.25)"
+                    vertical={false}
+                    strokeWidth={1}
+                  />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 11, fill: "oklch(0.50 0 0)" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: "oklch(0.50 0 0)" }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v: number) =>
+                      `৳${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`
+                    }
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "oklch(0.98 0 0)",
+                      border: "1px solid oklch(0.88 0 0)",
+                      borderRadius: "8px",
+                      fontSize: 12,
+                    }}
+                    formatter={(value: number, name: string) => [
+                      `৳${value.toLocaleString()}`,
+                      name === "commission" ? "Commission" : "Revenue",
+                    ]}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="revenue"
+                    stroke="oklch(0.68 0.25 40)"
+                    strokeWidth={1.5}
+                    fill="url(#revenueGrad)"
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="commission"
+                    stroke="oklch(0.52 0.28 199)"
+                    strokeWidth={2}
+                    fill="url(#commissionGrad)"
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           )}
           <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5">
