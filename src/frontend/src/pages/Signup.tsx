@@ -9,9 +9,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useRouter } from "@tanstack/react-router";
-import { CheckCircle, Eye, EyeOff, ShieldAlert, UserPlus } from "lucide-react";
-import { useState } from "react";
+import {
+  CheckCircle,
+  Eye,
+  EyeOff,
+  Gift,
+  ShieldAlert,
+  UserPlus,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { useReferral } from "../hooks/useReferral";
 
 type RoleOption = "Customer" | "Seller";
 
@@ -70,7 +78,11 @@ function PasswordStrength({ password }: { password: string }) {
 export function SignupPage() {
   const router = useRouter();
   const { signup } = useAuth();
+  // We use the referral hook with null initially (userId not known yet),
+  // but we call processSignupReferral directly after account creation
+  const { processSignupReferral, createCode } = useReferral(null);
 
+  const [refCode, setRefCode] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -80,6 +92,13 @@ export function SignupPage() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  // Read ?ref= param on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) setRefCode(ref);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,8 +116,17 @@ export function SignupPage() {
     if ("err" in result) {
       setError(result.err);
     } else {
+      // Generate their own referral code
+      const newUserId = email.toLowerCase().trim();
+      void createCode(newUserId);
+
+      // Process referral if they came via a referral link
+      if (refCode) {
+        void processSignupReferral(newUserId, refCode);
+      }
+
       setSuccess(true);
-      setTimeout(() => void router.navigate({ to: "/" }), 1200);
+      setTimeout(() => void router.navigate({ to: "/" }), 1500);
     }
   };
 
@@ -112,6 +140,12 @@ export function SignupPage() {
           <h2 className="font-display text-2xl font-bold text-foreground">
             Account created!
           </h2>
+          {refCode && (
+            <div className="flex items-center gap-2 justify-center px-4 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-300 text-sm font-medium text-emerald-700">
+              <Gift size={16} className="shrink-0" />
+              100 unit signup bonus added to your wallet!
+            </div>
+          )}
           <p className="text-sm text-muted-foreground">
             Taking you to the home page…
           </p>
@@ -137,6 +171,27 @@ export function SignupPage() {
             Join SuperApp — it's free
           </p>
         </div>
+
+        {/* Referral invite banner */}
+        {refCode && (
+          <div
+            className="flex items-center gap-3 p-3.5 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-300"
+            data-ocid="referral-invite-banner"
+          >
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0">
+              <Gift size={18} className="text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-emerald-700">
+                You were invited!
+              </p>
+              <p className="text-xs text-emerald-600 mt-0.5">
+                Sign up now and get a <strong>100 unit signup bonus</strong>{" "}
+                added to your wallet.
+              </p>
+            </div>
+          </div>
+        )}
 
         <Card className="border-border shadow-sm">
           <CardHeader className="pb-2">

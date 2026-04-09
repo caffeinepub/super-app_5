@@ -1,6 +1,8 @@
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import {
+  Gift,
   Home,
+  LayoutDashboard,
   LogIn,
   LogOut,
   ShieldCheck,
@@ -112,7 +114,7 @@ export function Layout({ children }: LayoutProps) {
                 Admin
               </button>
 
-              {/* Wallet link — visible only for authenticated sellers */}
+              {/* Wallet link — visible for authenticated sellers */}
               {isAuthenticated && role === "Seller" && (
                 <button
                   type="button"
@@ -129,6 +131,45 @@ export function Layout({ children }: LayoutProps) {
                   Wallet
                 </button>
               )}
+
+              {/* Seller Dashboard link — visible for authenticated sellers */}
+              {isAuthenticated && role === "Seller" && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    void router.navigate({ to: "/seller-dashboard" })
+                  }
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-body font-semibold transition-smooth ml-1 ${
+                    currentPath === "/seller-dashboard"
+                      ? "bg-indigo-600 text-white shadow-md"
+                      : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-900 border border-indigo-300"
+                  }`}
+                  data-ocid="nav-seller-dashboard"
+                  aria-label="Seller dashboard"
+                >
+                  <LayoutDashboard size={15} strokeWidth={2.5} />
+                  Dashboard
+                </button>
+              )}
+
+              {/* Referral link — visible for logged-in Customers and Sellers */}
+              {isAuthenticated &&
+                (role === "Customer" || role === "Seller") && (
+                  <button
+                    type="button"
+                    onClick={() => void router.navigate({ to: "/referral" })}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-body font-semibold transition-smooth ml-1 ${
+                      currentPath === "/referral"
+                        ? "bg-teal-600 text-white shadow-md"
+                        : "bg-teal-50 text-teal-700 hover:bg-teal-100 hover:text-teal-900 border border-teal-300"
+                    }`}
+                    data-ocid="nav-referral"
+                    aria-label="Refer and earn"
+                  >
+                    <Gift size={15} strokeWidth={2.5} />
+                    Refer &amp; Earn
+                  </button>
+                )}
             </nav>
 
             {/* Auth section */}
@@ -230,7 +271,7 @@ export function Layout({ children }: LayoutProps) {
         aria-label="Mobile navigation"
       >
         <div
-          className={`grid h-16 ${isAuthenticated && role === "Seller" ? "grid-cols-6" : "grid-cols-5"}`}
+          className={`grid h-16 ${isAuthenticated && role === "Seller" ? "grid-cols-8" : isAuthenticated ? "grid-cols-6" : "grid-cols-5"}`}
         >
           {navItems.map(({ to, label, icon: Icon }) => {
             const isActive =
@@ -292,6 +333,27 @@ export function Layout({ children }: LayoutProps) {
             </button>
           )}
 
+          {/* Seller Dashboard — visible for sellers only */}
+          {isAuthenticated && role === "Seller" && (
+            <button
+              type="button"
+              onClick={() => void router.navigate({ to: "/seller-dashboard" })}
+              className={`relative flex flex-col items-center justify-center gap-0.5 transition-smooth ${
+                currentPath === "/seller-dashboard"
+                  ? "text-white bg-indigo-600"
+                  : "text-indigo-600 bg-indigo-50"
+              }`}
+              aria-label="Seller dashboard"
+              data-ocid="mobile-nav-seller-dashboard"
+            >
+              <LayoutDashboard
+                size={20}
+                strokeWidth={currentPath === "/seller-dashboard" ? 2.5 : 2}
+              />
+              <span className="text-[10px] font-body font-bold">Dash</span>
+            </button>
+          )}
+
           {/* Admin — always visible with purple accent */}
           <button
             type="button"
@@ -313,6 +375,27 @@ export function Layout({ children }: LayoutProps) {
             <ShieldCheck size={20} strokeWidth={isAdminActive ? 2.5 : 2} />
             <span className="text-[10px] font-body font-bold">Admin</span>
           </button>
+
+          {/* Referral — visible for logged-in Customers and Sellers */}
+          {isAuthenticated && (role === "Customer" || role === "Seller") && (
+            <button
+              type="button"
+              onClick={() => void router.navigate({ to: "/referral" })}
+              className={`relative flex flex-col items-center justify-center gap-0.5 transition-smooth ${
+                currentPath === "/referral"
+                  ? "text-white bg-teal-600"
+                  : "text-teal-600 bg-teal-50"
+              }`}
+              aria-label="Refer and earn"
+              data-ocid="mobile-nav-referral"
+            >
+              <Gift
+                size={20}
+                strokeWidth={currentPath === "/referral" ? 2.5 : 2}
+              />
+              <span className="text-[10px] font-body font-bold">Refer</span>
+            </button>
+          )}
         </div>
       </nav>
 

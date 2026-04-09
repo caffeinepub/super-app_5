@@ -1,5 +1,48 @@
+import { useActor } from "@caffeineai/core-infrastructure";
+import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useState } from "react";
+import { createActor } from "../backend";
 import { useAuth } from "./useAuth";
+
+// ─── Seller withdrawal limit hook ─────────────────────────────────────────────
+
+type LimitActor = {
+  getSellerWithdrawalLimit(sellerId: string): Promise<[] | [number]>;
+};
+
+export function useMyWithdrawalLimit() {
+  const { userId } = useAuth();
+  const { actor, isFetching } = useActor(createActor);
+  const ext = actor as unknown as LimitActor | null;
+
+  return useQuery<number | null>({
+    queryKey: ["myWithdrawalLimit", userId],
+    queryFn: async () => {
+      if (!userId) return null;
+      if (ext && !isFetching) {
+        try {
+          const result = await ext.getSellerWithdrawalLimit(userId);
+          return result.length > 0 ? (result[0] ?? null) : null;
+        } catch {
+          // fall through to localStorage
+        }
+      }
+      // localStorage fallback (set by admin via useAdminWithdrawals)
+      try {
+        const raw = localStorage.getItem("superapp_seller_limits");
+        if (raw) {
+          const limits = JSON.parse(raw) as Record<string, number>;
+          return limits[userId] ?? null;
+        }
+      } catch {
+        /* ignore */
+      }
+      return null;
+    },
+    enabled: !!userId && !!ext && !isFetching,
+    staleTime: 30_000,
+  });
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -122,6 +165,7 @@ export function useWallet() {
       amount: number,
       method: PaymentMethod,
       accountNumber: string,
+      withdrawalLimit?: number | null,
     ): Promise<{ ok: true } | { err: string }> => {
       if (!userId || !wallet) return { err: "Not authenticated." };
       if (amount <= 0) return { err: "Amount must be greater than 0." };
@@ -129,6 +173,17 @@ export function useWallet() {
         return {
           err: `Insufficient balance. Available: ৳${wallet.remainingBalance.toLocaleString()}`,
         };
+      // Per-seller withdrawal limit check (client-side UX; backend also enforces)
+      if (
+        withdrawalLimit !== undefined &&
+        withdrawalLimit !== null &&
+        withdrawalLimit > 0 &&
+        amount > withdrawalLimit
+      ) {
+        return {
+          err: `Amount exceeds your withdrawal limit of ৳${withdrawalLimit.toLocaleString()}. Contact admin to increase your limit.`,
+        };
+      }
       if (!accountNumber.trim()) return { err: "Account number is required." };
       if (!/^\d{11}$/.test(accountNumber.replace(/\s/g, "")))
         return { err: "Please enter a valid 11-digit mobile number." };

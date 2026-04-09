@@ -51,4 +51,14 @@ module {
     topSellers : [(UserId, Float)];
     topProducts : [(Text, Float)];
   };
+
+  /// Per-seller withdrawal limit record set by an admin.
+  /// When a SellerLimit exists for a seller, withdrawal requests may not exceed `limit`.
+  /// `limit = 0.0` is treated as unlimited (no cap).
+  public type SellerLimit = {
+    sellerId : Text;
+    limit : Float;
+    setAt : Timestamp;
+    setBy : Text;
+  };
 };

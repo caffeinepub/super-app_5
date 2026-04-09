@@ -2,6 +2,7 @@ import List "mo:core/List";
 import Map "mo:core/Map";
 import Array "mo:core/Array";
 import Time "mo:core/Time";
+import Runtime "mo:core/Runtime";
 import PaymentTypes "../types/payments";
 import WalletTypes "../types/wallet";
 import Common "../types/common";
@@ -317,9 +318,7 @@ module {
     arr.sort(func(a, b) {
       if (b.1 > a.1) #less else if (b.1 < a.1) #greater else #equal
     });
-  };
-
-  /// Convert a nanosecond timestamp to a "YYYY-MM-DD" label.
+  };  /// Convert a nanosecond timestamp to a "YYYY-MM-DD" label.
   func timestampToDayLabel(ns : Int) : Text {
     let secs : Int = ns / 1_000_000_000;
     let days : Int = secs / 86400;
@@ -393,5 +392,31 @@ module {
     let yText = year.toText();
     let mText = if (month < 10) "0" # month.toText() else month.toText();
     yText # "-" # mText;
+  };
+
+  // ── Seller limit helpers ─────────────────────────────────────────────────
+
+  /// Get the withdrawal limit for a seller. Returns null if no limit is set.
+  public func getSellerLimit(
+    sellerLimits : Map.Map<Text, Float>,
+    sellerId : Text,
+  ) : ?Float {
+    Runtime.trap("not implemented");
+  };
+
+  /// Set or update the withdrawal limit for a seller.
+  public func setSellerLimit(
+    sellerLimits : Map.Map<Text, Float>,
+    sellerId : Text,
+    limit : Float,
+  ) {
+    Runtime.trap("not implemented");
+  };
+
+  /// Return all seller limits as a flat array of (sellerId, limit) pairs.
+  public func getAllSellerLimits(
+    sellerLimits : Map.Map<Text, Float>,
+  ) : [(Text, Float)] {
+    Runtime.trap("not implemented");
   };
 };

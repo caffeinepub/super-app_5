@@ -10,6 +10,17 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export interface AuditEntry {
+  'id' : string,
+  'oldValue' : [] | [string],
+  'resourceId' : string,
+  'newValue' : [] | [string],
+  'actionType' : string,
+  'actorId' : string,
+  'resourceType' : string,
+  'timestamp' : Timestamp,
+  'details' : string,
+}
 export interface CommissionRecord {
   'id' : bigint,
   'rate' : number,
@@ -24,6 +35,13 @@ export interface CommissionSummary {
   'topProducts' : Array<[string, number]>,
   'topSellers' : Array<[UserId, number]>,
   'byPeriod' : Array<[string, number]>,
+}
+export interface LeaderboardEntry {
+  'totalRewardEarned' : number,
+  'totalReferrals' : bigint,
+  'rank' : bigint,
+  'lastReferralDate' : bigint,
+  'referrerId' : string,
 }
 export interface Order {
   'id' : bigint,
@@ -55,6 +73,41 @@ export interface PaymentRecord {
 export type PaymentStatus = { 'Approved' : null } |
   { 'Rejected' : null } |
   { 'Pending' : null };
+export interface ReferralRecord {
+  'id' : string,
+  'status' : ReferralStatus,
+  'completedAt' : Timestamp,
+  'referrerReward' : bigint,
+  'code' : string,
+  'refereeId' : string,
+  'refereeBonus' : bigint,
+  'referrerId' : string,
+}
+export type ReferralStatus = { 'Invalid' : null } |
+  { 'Completed' : null } |
+  { 'Pending' : null };
+export interface SellerDashboardSummary {
+  'totalNetEarnings' : number,
+  'remainingBalance' : number,
+  'totalWithdrawn' : number,
+  'periodLabel' : string,
+  'totalGrossRevenue' : number,
+  'totalCommissionDeducted' : number,
+}
+export interface SellerEarningsByPeriod {
+  'period' : string,
+  'grossRevenue' : number,
+  'netRevenue' : number,
+  'commissionDeducted' : number,
+}
+export interface SellerProductStat {
+  'productId' : string,
+  'productName' : string,
+  'netRevenue' : number,
+  'salesCount' : bigint,
+  'totalRevenue' : number,
+  'commissionDeducted' : number,
+}
 export interface SellerWallet {
   'pendingWithdrawal' : number,
   'totalWithdrawn' : number,
@@ -88,7 +141,14 @@ export interface _SERVICE {
     { 'ok' : null } |
       { 'err' : string }
   >,
+  'checkLoginLockout' : ActorMethod<
+    [string],
+    { 'locked' : boolean, 'remainingSecs' : bigint }
+  >,
+  'clearLoginAttempts' : ActorMethod<[string], undefined>,
   'createOrder' : ActorMethod<[Array<OrderItem>], Order>,
+  'createReferralCode' : ActorMethod<[string], string>,
+  'generateOtp' : ActorMethod<[string, string], string>,
   'getAdminStats' : ActorMethod<
     [],
     {
@@ -98,16 +158,44 @@ export interface _SERVICE {
     }
   >,
   'getAllOrders' : ActorMethod<[], Array<Order>>,
+  'getAllSellerLimits' : ActorMethod<[], Array<[string, number]>>,
+  'getAllSellerSuspensions' : ActorMethod<[bigint, bigint], Array<AuditEntry>>,
+  'getAuditLog' : ActorMethod<[bigint, bigint], Array<AuditEntry>>,
+  'getAuditLogByAction' : ActorMethod<
+    [string, bigint, bigint],
+    Array<AuditEntry>
+  >,
+  'getAuditLogByActor' : ActorMethod<
+    [string, bigint, bigint],
+    Array<AuditEntry>
+  >,
+  'getAuditLogByDateRange' : ActorMethod<
+    [bigint, bigint, bigint, bigint],
+    Array<AuditEntry>
+  >,
   'getCommissionByMonth' : ActorMethod<[bigint], Array<[string, number]>>,
   'getCommissionByPeriod' : ActorMethod<[string], Array<[string, number]>>,
   'getCommissionSummary' : ActorMethod<[], CommissionSummary>,
   'getFeaturedIds' : ActorMethod<[string], Array<string>>,
   'getFeaturedIdsByCategory' : ActorMethod<[string], Array<string>>,
+  'getMyEarningsByPeriod' : ActorMethod<
+    [bigint, string],
+    Array<SellerEarningsByPeriod>
+  >,
+  'getMyEarningsSummary' : ActorMethod<[bigint], SellerDashboardSummary>,
   'getMyOrders' : ActorMethod<[], Array<Order>>,
   'getMyPrincipal' : ActorMethod<[], string>,
+  'getMyProductStats' : ActorMethod<[bigint], Array<SellerProductStat>>,
+  'getMyReferralEarnings' : ActorMethod<[], bigint>,
+  'getMyReferrals' : ActorMethod<[], Array<ReferralRecord>>,
   'getMyRole' : ActorMethod<[], UserRole>,
+  'getMySellerOrders' : ActorMethod<[], Array<Order>>,
   'getPayment' : ActorMethod<[bigint], [] | [PaymentRecord]>,
+  'getReferralCode' : ActorMethod<[string], [] | [string]>,
+  'getReferralLeaderboard' : ActorMethod<[], Array<LeaderboardEntry>>,
   'getSellerWallet' : ActorMethod<[UserId], [] | [SellerWallet]>,
+  'getSellerWithdrawalLimit' : ActorMethod<[string], [] | [number]>,
+  'getSuspensionAuditTrail' : ActorMethod<[string], Array<AuditEntry>>,
   'getTopProducts' : ActorMethod<[bigint], Array<[string, number]>>,
   'getTopSellers' : ActorMethod<[bigint], Array<[UserId, number]>>,
   'getUserProfile' : ActorMethod<[UserId], [] | [UserProfile]>,
@@ -121,6 +209,8 @@ export interface _SERVICE {
   'myPayments' : ActorMethod<[], Array<PaymentRecord>>,
   'myWallet' : ActorMethod<[], SellerWallet>,
   'myWithdrawals' : ActorMethod<[], Array<WithdrawRequest>>,
+  'processReferral' : ActorMethod<[string, string], boolean>,
+  'recordLoginFailure' : ActorMethod<[string], bigint>,
   'rejectPayment' : ActorMethod<[bigint], boolean>,
   'rejectWithdrawal' : ActorMethod<[bigint], boolean>,
   'requestAdminRole' : ActorMethod<[], { 'ok' : string } | { 'err' : string }>,
@@ -130,6 +220,7 @@ export interface _SERVICE {
     { 'ok' : null } |
       { 'err' : string }
   >,
+  'setSellerWithdrawalLimit' : ActorMethod<[string, number], undefined>,
   'setUserProfile' : ActorMethod<[string], undefined>,
   'setupAdminPassword' : ActorMethod<
     [string],
@@ -151,6 +242,7 @@ export interface _SERVICE {
       { 'err' : string }
   >,
   'verifyAdminPassword' : ActorMethod<[string], boolean>,
+  'verifyOtp' : ActorMethod<[string, string, string], boolean>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

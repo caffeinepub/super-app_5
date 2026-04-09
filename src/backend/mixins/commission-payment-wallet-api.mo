@@ -10,6 +10,8 @@ import RolesLib "../lib/roles";
 import RoleTypes "../types/roles";
 import OrdersLib "../lib/orders";
 import OrderTypes "../types/orders";
+import AuditLib "../lib/audit";
+import AuditTypes "../types/audit";
 
 /// Public API mixin for the commission-payment-wallet domain.
 /// Receives only the state slices it needs.
@@ -21,6 +23,9 @@ mixin (
   counters : PaymentTypes.Counters,
   roles : Map.Map<RoleTypes.UserId, RoleTypes.UserRole>,
   orders : List.List<OrderTypes.Order>,
+  auditLog : List.List<AuditTypes.AuditEntry>,
+  auditCounter : { var value : Nat },
+  sellerLimits : Map.Map<Text, Float>,
 ) {
 
   // ── Payment submission (buyer) ───────────────────────────────────────────
@@ -80,7 +85,8 @@ mixin (
     switch (CommLib.getPayment(payments, id)) {
       case null false;
       case (?p) {
-        CommLib.updatePaymentStatus(payments, id, #Approved, Time.now());
+        let now = Time.now();
+        CommLib.updatePaymentStatus(payments, id, #Approved, now);
         // Credit the seller's wallet
         CommLib.creditEarnings(wallets, p.userId, p.sellerEarnings);
         // Create a commission record
@@ -90,12 +96,20 @@ mixin (
           p.userId,
           "order-" # p.orderId.toText(),
           p.amount,
-          Time.now(),
+          now,
         );
         counters.nextCommissionId += 1;
         commissions.add(commRecord);
         // Advance the order to #Ongoing
         ignore OrdersLib.updateOrderStatus(orders, p.orderId, #Ongoing);
+        // Audit
+        AuditLib.logAction(
+          auditLog, auditCounter,
+          caller.toText(), AuditTypes.ActionType.APPROVE_PAYMENT,
+          id.toText(), "Payment",
+          "Payment approved; orderId=" # p.orderId.toText(),
+          ?"Pending", ?"Approved", now,
+        );
         true;
       };
     };
@@ -108,8 +122,17 @@ mixin (
     };
     switch (CommLib.getPayment(payments, id)) {
       case null false;
-      case (_) {
-        CommLib.updatePaymentStatus(payments, id, #Rejected, Time.now());
+      case (?p) {
+        let now = Time.now();
+        CommLib.updatePaymentStatus(payments, id, #Rejected, now);
+        // Audit
+        AuditLib.logAction(
+          auditLog, auditCounter,
+          caller.toText(), AuditTypes.ActionType.REJECT_PAYMENT,
+          id.toText(), "Payment",
+          "Payment rejected; orderId=" # p.orderId.toText(),
+          ?"Pending", ?"Rejected", now,
+        );
         true;
       };
     };
@@ -160,6 +183,15 @@ mixin (
     if (amount > available) {
       Runtime.trap("Insufficient balance");
     };
+    // Enforce per-seller withdrawal limit when set
+    switch (sellerLimits.get(caller.toText())) {
+      case (?lim) {
+        if (lim > 0.0 and amount > lim) {
+          Runtime.trap("Amount exceeds your withdrawal limit");
+        };
+      };
+      case null {};
+    };
     // Reserve the amount as pending
     wallets.add(caller, { wallet with pendingWithdrawal = wallet.pendingWithdrawal + amount });
 
@@ -200,8 +232,17 @@ mixin (
     };
     switch (CommLib.getWithdrawRequest(withdrawals, id)) {
       case null false;
-      case (_) {
-        CommLib.updateWithdrawStatus(withdrawals, wallets, id, #Approved, Time.now());
+      case (?w) {
+        let now = Time.now();
+        CommLib.updateWithdrawStatus(withdrawals, wallets, id, #Approved, now);
+        // Audit
+        AuditLib.logAction(
+          auditLog, auditCounter,
+          caller.toText(), AuditTypes.ActionType.APPROVE_WITHDRAWAL,
+          id.toText(), "Withdrawal",
+          "Withdrawal approved; seller=" # w.sellerId.toText() # " amount=" # debug_show(w.amount),
+          ?"Pending", ?"Approved", now,
+        );
         true;
       };
     };
@@ -214,8 +255,17 @@ mixin (
     };
     switch (CommLib.getWithdrawRequest(withdrawals, id)) {
       case null false;
-      case (_) {
-        CommLib.updateWithdrawStatus(withdrawals, wallets, id, #Rejected, Time.now());
+      case (?w) {
+        let now = Time.now();
+        CommLib.updateWithdrawStatus(withdrawals, wallets, id, #Rejected, now);
+        // Audit
+        AuditLib.logAction(
+          auditLog, auditCounter,
+          caller.toText(), AuditTypes.ActionType.REJECT_WITHDRAWAL,
+          id.toText(), "Withdrawal",
+          "Withdrawal rejected; seller=" # w.sellerId.toText() # " amount=" # debug_show(w.amount),
+          ?"Pending", ?"Rejected", now,
+        );
         true;
       };
     };
@@ -295,5 +345,23 @@ mixin (
     let pendingWithdrawals = withdrawals.filter(func(w) { w.status == #Pending }).size();
     let newOrders = orders.filter(func(o) { o.status == #Pending }).size();
     { pendingPayments; pendingWithdrawals; newOrders };
+  };
+
+  // ── Per-seller withdrawal limits (admin) ─────────────────────────────────
+
+  /// Set or update the withdrawal limit for a specific seller (admin only).
+  /// Pass limit = 0.0 to remove the cap (unlimited).
+  public shared ({ caller }) func setSellerWithdrawalLimit(sellerId : Text, limit : Float) : async () {
+    Runtime.trap("not implemented");
+  };
+
+  /// Get the withdrawal limit for a specific seller. Returns null if no limit is set.
+  public query func getSellerWithdrawalLimit(sellerId : Text) : async ?Float {
+    Runtime.trap("not implemented");
+  };
+
+  /// Get all seller-specific withdrawal limits (admin).
+  public shared query ({ caller }) func getAllSellerLimits() : async [(Text, Float)] {
+    Runtime.trap("not implemented");
   };
 };

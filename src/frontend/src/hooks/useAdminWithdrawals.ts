@@ -16,14 +16,26 @@ export interface WithdrawalRequest {
   requestedAt: number;
 }
 
+export interface SellerLimit {
+  sellerId: string;
+  limit: number;
+}
+
 type ExtendedActor = {
   listPendingWithdrawals(): Promise<WithdrawalRequest[]>;
   listAllWithdrawals(): Promise<WithdrawalRequest[]>;
   approveWithdrawal(id: string): Promise<{ ok: null } | { err: string }>;
   rejectWithdrawal(id: string): Promise<{ ok: null } | { err: string }>;
+  getAllSellerLimits(): Promise<Array<[string, number]>>;
+  setSellerWithdrawalLimit(
+    sellerId: string,
+    limit: number,
+  ): Promise<{ ok: null } | { err: string }>;
+  getSellerWithdrawalLimit(sellerId: string): Promise<[] | [number]>;
 };
 
 const WITHDRAWALS_KEY = "superapp_withdrawals";
+const SELLER_LIMITS_KEY = "superapp_seller_limits";
 
 function loadWithdrawals(): WithdrawalRequest[] {
   try {
@@ -36,6 +48,19 @@ function loadWithdrawals(): WithdrawalRequest[] {
 
 function saveWithdrawals(data: WithdrawalRequest[]): void {
   localStorage.setItem(WITHDRAWALS_KEY, JSON.stringify(data));
+}
+
+function loadLimits(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem(SELLER_LIMITS_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, number>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveLimits(limits: Record<string, number>): void {
+  localStorage.setItem(SELLER_LIMITS_KEY, JSON.stringify(limits));
 }
 
 export function useAdminPendingWithdrawals() {
@@ -115,6 +140,98 @@ export function useAdminWithdrawalAction() {
       },
     },
   );
+}
+
+// ─── Per-seller withdrawal limits ─────────────────────────────────────────────
+
+export function useAllSellerLimits() {
+  const { actor, isFetching } = useActor(createActor);
+  const ext = actor as unknown as ExtendedActor | null;
+
+  return useQuery<SellerLimit[]>({
+    queryKey: ["allSellerLimits"],
+    queryFn: async () => {
+      if (ext && !isFetching) {
+        try {
+          const pairs = await ext.getAllSellerLimits();
+          return pairs.map(([sellerId, limit]) => ({ sellerId, limit }));
+        } catch {
+          // fall through to localStorage
+        }
+      }
+      const limits = loadLimits();
+      return Object.entries(limits).map(([sellerId, limit]) => ({
+        sellerId,
+        limit,
+      }));
+    },
+    enabled: !!ext && !isFetching,
+    staleTime: 30_000,
+  });
+}
+
+export function useGetSellerWithdrawalLimit(sellerId: string) {
+  const { actor, isFetching } = useActor(createActor);
+  const ext = actor as unknown as ExtendedActor | null;
+
+  return useQuery<number | null>({
+    queryKey: ["sellerLimit", sellerId],
+    queryFn: async () => {
+      if (!sellerId) return null;
+      if (ext && !isFetching) {
+        try {
+          const result = await ext.getSellerWithdrawalLimit(sellerId);
+          // Motoko ?Float returns [] or [value]
+          return result.length > 0 ? (result[0] ?? null) : null;
+        } catch {
+          // fall through
+        }
+      }
+      const limits = loadLimits();
+      return limits[sellerId] ?? null;
+    },
+    enabled: !!sellerId && !!ext && !isFetching,
+    staleTime: 30_000,
+  });
+}
+
+export function useSetSellerWithdrawalLimit() {
+  const queryClient = useQueryClient();
+  const { actor } = useActor(createActor);
+  const ext = actor as unknown as ExtendedActor | null;
+
+  return useMutation<void, Error, { sellerId: string; limit: number | null }>({
+    mutationFn: async ({ sellerId, limit }) => {
+      const effectiveLimit = limit ?? 0;
+      if (ext) {
+        try {
+          const result = await ext.setSellerWithdrawalLimit(
+            sellerId,
+            effectiveLimit,
+          );
+          if ("err" in result) throw new Error(result.err);
+          return;
+        } catch (e) {
+          if (e instanceof Error && e.message !== "Method not found") throw e;
+        }
+      }
+      // localStorage fallback
+      const limits = loadLimits();
+      if (effectiveLimit <= 0) {
+        delete limits[sellerId];
+      } else {
+        limits[sellerId] = effectiveLimit;
+      }
+      saveLimits(limits);
+    },
+    onSuccess: (_data, { sellerId }) => {
+      void queryClient.invalidateQueries({ queryKey: ["allSellerLimits"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["sellerLimit", sellerId],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["myWithdrawalLimit"] });
+    },
+  });
 }
 
 // --- Sample withdrawal data shown before backend is deployed ---

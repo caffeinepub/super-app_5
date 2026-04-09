@@ -1,8 +1,16 @@
 import Map "mo:core/Map";
+import Time "mo:core/Time";
+import List "mo:core/List";
 import RolesLib "../lib/roles";
 import RoleTypes "../types/roles";
+import AuditLib "../lib/audit";
+import AuditTypes "../types/audit";
 
-mixin (roles : Map.Map<RoleTypes.UserId, RoleTypes.UserRole>) {
+mixin (
+  roles : Map.Map<RoleTypes.UserId, RoleTypes.UserRole>,
+  auditLog : List.List<AuditTypes.AuditEntry>,
+  auditCounter : { var value : Nat },
+) {
 
   /// Returns the role of the calling user.
   /// Defaults to #Customer if the user has no assigned role.
@@ -43,7 +51,20 @@ mixin (roles : Map.Map<RoleTypes.UserId, RoleTypes.UserRole>) {
     if (not RolesLib.isAdmin(roles, caller)) {
       return #err("Unauthorized: Admin role required");
     };
+    let oldRole = RolesLib.getRole(roles, userId);
     RolesLib.setRole(roles, userId, role);
+    let now = Time.now();
+    let actionType = switch (role) {
+      case (#Admin) AuditTypes.ActionType.ADMIN_ROLE_GRANTED;
+      case (_) AuditTypes.ActionType.ADMIN_ROLE_REVOKED;
+    };
+    AuditLib.logAction(
+      auditLog, auditCounter,
+      caller.toText(), actionType,
+      userId.toText(), "User",
+      "Role changed to " # debug_show(role),
+      ?debug_show(oldRole), ?debug_show(role), now,
+    );
     #ok;
   };
 };

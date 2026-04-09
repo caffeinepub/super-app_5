@@ -9,6 +9,9 @@ import OrderTypes "types/orders";
 import RoleTypes "types/roles";
 import PaymentTypes "types/payments";
 import WalletTypes "types/wallet";
+import SecurityTypes "types/security";
+import AuditTypes "types/audit";
+import ReferralTypes "types/referral";
 import Common "types/common";
 import ProfilesApi "mixins/profiles-api";
 import FeaturedApi "mixins/featured-api";
@@ -16,6 +19,10 @@ import AdminApi "mixins/admin-api";
 import OrdersApi "mixins/orders-api";
 import RolesApi "mixins/roles-api";
 import CommissionPaymentWalletApi "mixins/commission-payment-wallet-api";
+import SellerDashboardApi "mixins/seller-dashboard-api";
+import SecurityApi "mixins/security-api";
+import AuditApi "mixins/audit-api";
+import ReferralApi "mixins/referral-api";
 
 actor {
   // Existing state — unchanged
@@ -40,16 +47,33 @@ actor {
     var nextCommissionId = 0;
   };
 
+  // State for security (login lockout + OTP)
+  let lockouts = Map.empty<Text, SecurityTypes.LockoutRecord>();
+  let otps = Map.empty<Text, SecurityTypes.OtpRecord>();
+
+  // State for per-seller withdrawal limits (key = sellerId Text, value = limit Float)
+  let sellerLimits = Map.empty<Text, Float>();
+
+  // State for audit log (append-only, immutable entries)
+  let auditLog = List.empty<AuditTypes.AuditEntry>();
+  let auditCounter : { var value : Nat } = { var value = 0 };
+
+  // State for referral system
+  let referrals = List.empty<ReferralTypes.ReferralRecord>();
+  let userToCode = Map.empty<Text, Text>();
+  let codeToUser = Map.empty<Text, Text>();
+  let referralCounter : { var value : Nat } = { var value = 0 };
+
   // Existing mixins — unchanged
   include ProfilesApi(profiles);
   include FeaturedApi(featured);
   include AdminApi(adminState, featured);
 
-  // Role and order mixins
-  include RolesApi(roles);
+  // Role and order mixins (roles-api now receives audit state)
+  include RolesApi(roles, auditLog, auditCounter);
   include OrdersApi(orders, roles);
 
-  // Commission, payment, and wallet mixin
+  // Commission, payment, and wallet mixin (now receives audit state + sellerLimits)
   include CommissionPaymentWalletApi(
     payments,
     withdrawals,
@@ -58,5 +82,20 @@ actor {
     counters,
     roles,
     orders,
+    auditLog,
+    auditCounter,
+    sellerLimits,
   );
+
+  // Seller dashboard mixin
+  include SellerDashboardApi(orders, commissions, wallets);
+
+  // Security mixin (login lockout + OTP)
+  include SecurityApi(lockouts, otps);
+
+  // Audit log mixin
+  include AuditApi(auditLog, auditCounter);
+
+  // Referral mixin
+  include ReferralApi(referrals, userToCode, codeToUser, referralCounter, wallets);
 };

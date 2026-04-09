@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
+import { OtpModal } from "../components/OtpModal";
 import { useAuth } from "../hooks/useAuth";
 import {
   type PaymentMethod,
@@ -95,10 +96,6 @@ function StatCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay }}
       className={`relative overflow-hidden rounded-2xl p-6 text-white shadow-lg ${gradient}`}
-      style={{
-        animation: `float ${3 + delay * 2}s ease-in-out infinite`,
-        animationDelay: `${delay}s`,
-      }}
     >
       <div className="flex items-start justify-between">
         <div>
@@ -124,17 +121,17 @@ function StatCard({
 
 interface WithdrawFormProps {
   maxAmount: number;
-  onSubmit: (
+  onRequestOtp: (
     amount: number,
     method: PaymentMethod,
     account: string,
-  ) => Promise<void>;
+  ) => void;
   isSubmitting: boolean;
 }
 
 function WithdrawForm({
   maxAmount,
-  onSubmit,
+  onRequestOtp,
   isSubmitting,
 }: WithdrawFormProps) {
   const [amount, setAmount] = useState("");
@@ -145,7 +142,7 @@ function WithdrawForm({
   const amountNum = Number.parseFloat(amount) || 0;
   const isInsufficient = amountNum > maxAmount && amount !== "";
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFieldError(null);
 
@@ -162,14 +159,12 @@ function WithdrawForm({
       return;
     }
 
-    await onSubmit(amountNum, method, account);
-    setAmount("");
-    setAccount("");
-    setFieldError(null);
+    // Trigger OTP flow instead of submitting directly
+    onRequestOtp(amountNum, method, account);
   }
 
   return (
-    <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
+    <form onSubmit={handleSubmit} className="space-y-5">
       {/* Amount */}
       <div>
         <label
@@ -215,12 +210,9 @@ function WithdrawForm({
 
       {/* Payment Method */}
       <div>
-        <label
-          htmlFor="withdraw-method"
-          className="block text-sm font-semibold text-foreground mb-2"
-        >
+        <p className="block text-sm font-semibold text-foreground mb-2">
           Payment Method
-        </label>
+        </p>
         <div className="grid grid-cols-2 gap-3">
           {(["bKash", "Nagad"] as PaymentMethod[]).map((m) => {
             const isBkash = m === "bKash";
@@ -261,13 +253,11 @@ function WithdrawForm({
       {/* Account Number */}
       <div>
         <label
-          htmlFor="withdraw-method"
+          htmlFor="withdraw-account"
           className="block text-sm font-semibold text-foreground mb-2"
         >
-          Payment Method
+          {method} Account Number
         </label>
-        {/* Hidden to satisfy a11y — visible choice via buttons below */}
-        <input id="withdraw-method" type="hidden" value={method} readOnly />
         <input
           id="withdraw-account"
           type="tel"
@@ -298,7 +288,7 @@ function WithdrawForm({
         )}
       </AnimatePresence>
 
-      {/* Submit */}
+      {/* Submit — triggers OTP */}
       <button
         type="submit"
         disabled={isSubmitting || amountNum <= 0 || isInsufficient}
@@ -355,20 +345,34 @@ function RequestRow({ req, index }: { req: WithdrawRequest; index: number }) {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export function WalletPage() {
-  const { isAuthenticated, role } = useAuth();
+  const { isAuthenticated, role, userId } = useAuth();
   const { wallet, isLoading, requestWithdrawal } = useWallet();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  async function handleWithdraw(
+  // OTP state — pending withdrawal details until OTP confirmed
+  const [pendingWithdrawal, setPendingWithdrawal] = useState<{
+    amount: number;
+    method: PaymentMethod;
+    account: string;
+  } | null>(null);
+
+  function handleRequestOtp(
     amount: number,
     method: PaymentMethod,
     account: string,
   ) {
+    setPendingWithdrawal({ amount, method, account });
+  }
+
+  async function handleConfirmedWithdraw() {
+    if (!pendingWithdrawal) return;
+    const { amount, method, account } = pendingWithdrawal;
     setIsSubmitting(true);
     setSubmitError(null);
     setSuccessMessage(null);
+    setPendingWithdrawal(null);
 
     const result = await requestWithdrawal(amount, method, account);
     setIsSubmitting(false);
@@ -430,6 +434,20 @@ export function WalletPage() {
   // ── Wallet Dashboard ───────────────────────────────────────────────────────
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 pb-24 sm:pb-8 space-y-8">
+      {/* OTP Modal for withdrawal verification */}
+      <OtpModal
+        open={!!pendingWithdrawal}
+        userId={userId ?? "user"}
+        action="WithdrawalRequest"
+        actionLabel={
+          pendingWithdrawal
+            ? `Withdraw ${formatMoney(pendingWithdrawal.amount)} via ${pendingWithdrawal.method}`
+            : "Withdrawal Request"
+        }
+        onConfirm={handleConfirmedWithdraw}
+        onCancel={() => setPendingWithdrawal(null)}
+      />
+
       {/* Page header */}
       <motion.div
         initial={{ opacity: 0, y: -12 }}
@@ -503,6 +521,9 @@ export function WalletPage() {
           <h2 className="font-display text-lg font-bold text-foreground">
             Request Withdrawal
           </h2>
+          <span className="ml-auto text-xs bg-accent/10 text-accent border border-accent/20 rounded-full px-2 py-0.5 font-semibold">
+            OTP Protected
+          </span>
         </div>
 
         {/* Success banner */}
@@ -539,9 +560,7 @@ export function WalletPage() {
 
         <WithdrawForm
           maxAmount={wallet.remainingBalance}
-          onSubmit={(amount, method, account) =>
-            handleWithdraw(amount, method, account)
-          }
+          onRequestOtp={handleRequestOtp}
           isSubmitting={isSubmitting}
         />
       </motion.section>

@@ -33,11 +33,59 @@ export const Order = IDL.Record({
   'date' : Timestamp,
   'items' : IDL.Vec(OrderItem),
 });
+export const AuditEntry = IDL.Record({
+  'id' : IDL.Text,
+  'oldValue' : IDL.Opt(IDL.Text),
+  'resourceId' : IDL.Text,
+  'newValue' : IDL.Opt(IDL.Text),
+  'actionType' : IDL.Text,
+  'actorId' : IDL.Text,
+  'resourceType' : IDL.Text,
+  'timestamp' : Timestamp,
+  'details' : IDL.Text,
+});
 export const CommissionSummary = IDL.Record({
   'totalCommission' : IDL.Float64,
   'topProducts' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64)),
   'topSellers' : IDL.Vec(IDL.Tuple(UserId, IDL.Float64)),
   'byPeriod' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64)),
+});
+export const SellerEarningsByPeriod = IDL.Record({
+  'period' : IDL.Text,
+  'grossRevenue' : IDL.Float64,
+  'netRevenue' : IDL.Float64,
+  'commissionDeducted' : IDL.Float64,
+});
+export const SellerDashboardSummary = IDL.Record({
+  'totalNetEarnings' : IDL.Float64,
+  'remainingBalance' : IDL.Float64,
+  'totalWithdrawn' : IDL.Float64,
+  'periodLabel' : IDL.Text,
+  'totalGrossRevenue' : IDL.Float64,
+  'totalCommissionDeducted' : IDL.Float64,
+});
+export const SellerProductStat = IDL.Record({
+  'productId' : IDL.Text,
+  'productName' : IDL.Text,
+  'netRevenue' : IDL.Float64,
+  'salesCount' : IDL.Nat,
+  'totalRevenue' : IDL.Float64,
+  'commissionDeducted' : IDL.Float64,
+});
+export const ReferralStatus = IDL.Variant({
+  'Invalid' : IDL.Null,
+  'Completed' : IDL.Null,
+  'Pending' : IDL.Null,
+});
+export const ReferralRecord = IDL.Record({
+  'id' : IDL.Text,
+  'status' : ReferralStatus,
+  'completedAt' : Timestamp,
+  'referrerReward' : IDL.Nat,
+  'code' : IDL.Text,
+  'refereeId' : IDL.Text,
+  'refereeBonus' : IDL.Nat,
+  'referrerId' : IDL.Text,
 });
 export const PaymentStatus = IDL.Variant({
   'Approved' : IDL.Null,
@@ -60,6 +108,13 @@ export const PaymentRecord = IDL.Record({
   'orderId' : IDL.Nat,
   'amount' : IDL.Float64,
   'transactionId' : IDL.Text,
+});
+export const LeaderboardEntry = IDL.Record({
+  'totalRewardEarned' : IDL.Float64,
+  'totalReferrals' : IDL.Nat,
+  'rank' : IDL.Nat,
+  'lastReferralDate' : IDL.Int,
+  'referrerId' : IDL.Text,
 });
 export const SellerWallet = IDL.Record({
   'pendingWithdrawal' : IDL.Float64,
@@ -101,7 +156,15 @@ export const idlService = IDL.Service({
       [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
       [],
     ),
+  'checkLoginLockout' : IDL.Func(
+      [IDL.Text],
+      [IDL.Record({ 'locked' : IDL.Bool, 'remainingSecs' : IDL.Int })],
+      ['query'],
+    ),
+  'clearLoginAttempts' : IDL.Func([IDL.Text], [], []),
   'createOrder' : IDL.Func([IDL.Vec(OrderItem)], [Order], []),
+  'createReferralCode' : IDL.Func([IDL.Text], [IDL.Text], []),
+  'generateOtp' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
   'getAdminStats' : IDL.Func(
       [],
       [
@@ -114,6 +177,36 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'getAllOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+  'getAllSellerLimits' : IDL.Func(
+      [],
+      [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64))],
+      ['query'],
+    ),
+  'getAllSellerSuspensions' : IDL.Func(
+      [IDL.Nat, IDL.Nat],
+      [IDL.Vec(AuditEntry)],
+      ['query'],
+    ),
+  'getAuditLog' : IDL.Func(
+      [IDL.Nat, IDL.Nat],
+      [IDL.Vec(AuditEntry)],
+      ['query'],
+    ),
+  'getAuditLogByAction' : IDL.Func(
+      [IDL.Text, IDL.Nat, IDL.Nat],
+      [IDL.Vec(AuditEntry)],
+      ['query'],
+    ),
+  'getAuditLogByActor' : IDL.Func(
+      [IDL.Text, IDL.Nat, IDL.Nat],
+      [IDL.Vec(AuditEntry)],
+      ['query'],
+    ),
+  'getAuditLogByDateRange' : IDL.Func(
+      [IDL.Int, IDL.Int, IDL.Nat, IDL.Nat],
+      [IDL.Vec(AuditEntry)],
+      ['query'],
+    ),
   'getCommissionByMonth' : IDL.Func(
       [IDL.Nat],
       [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64))],
@@ -131,11 +224,45 @@ export const idlService = IDL.Service({
       [IDL.Vec(IDL.Text)],
       ['query'],
     ),
+  'getMyEarningsByPeriod' : IDL.Func(
+      [IDL.Nat, IDL.Text],
+      [IDL.Vec(SellerEarningsByPeriod)],
+      ['query'],
+    ),
+  'getMyEarningsSummary' : IDL.Func(
+      [IDL.Nat],
+      [SellerDashboardSummary],
+      ['query'],
+    ),
   'getMyOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
   'getMyPrincipal' : IDL.Func([], [IDL.Text], ['query']),
+  'getMyProductStats' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Vec(SellerProductStat)],
+      ['query'],
+    ),
+  'getMyReferralEarnings' : IDL.Func([], [IDL.Nat], ['query']),
+  'getMyReferrals' : IDL.Func([], [IDL.Vec(ReferralRecord)], ['query']),
   'getMyRole' : IDL.Func([], [UserRole], ['query']),
+  'getMySellerOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
   'getPayment' : IDL.Func([IDL.Nat], [IDL.Opt(PaymentRecord)], ['query']),
+  'getReferralCode' : IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
+  'getReferralLeaderboard' : IDL.Func(
+      [],
+      [IDL.Vec(LeaderboardEntry)],
+      ['query'],
+    ),
   'getSellerWallet' : IDL.Func([UserId], [IDL.Opt(SellerWallet)], ['query']),
+  'getSellerWithdrawalLimit' : IDL.Func(
+      [IDL.Text],
+      [IDL.Opt(IDL.Float64)],
+      ['query'],
+    ),
+  'getSuspensionAuditTrail' : IDL.Func(
+      [IDL.Text],
+      [IDL.Vec(AuditEntry)],
+      ['query'],
+    ),
   'getTopProducts' : IDL.Func(
       [IDL.Nat],
       [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64))],
@@ -161,6 +288,8 @@ export const idlService = IDL.Service({
   'myPayments' : IDL.Func([], [IDL.Vec(PaymentRecord)], ['query']),
   'myWallet' : IDL.Func([], [SellerWallet], ['query']),
   'myWithdrawals' : IDL.Func([], [IDL.Vec(WithdrawRequest)], ['query']),
+  'processReferral' : IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
+  'recordLoginFailure' : IDL.Func([IDL.Text], [IDL.Nat], []),
   'rejectPayment' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'rejectWithdrawal' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'requestAdminRole' : IDL.Func(
@@ -178,6 +307,7 @@ export const idlService = IDL.Service({
       [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
       [],
     ),
+  'setSellerWithdrawalLimit' : IDL.Func([IDL.Text, IDL.Float64], [], []),
   'setUserProfile' : IDL.Func([IDL.Text], [], []),
   'setupAdminPassword' : IDL.Func(
       [IDL.Text],
@@ -200,6 +330,7 @@ export const idlService = IDL.Service({
       [],
     ),
   'verifyAdminPassword' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
+  'verifyOtp' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
 });
 
 export const idlInitArgs = [];
@@ -230,11 +361,59 @@ export const idlFactory = ({ IDL }) => {
     'date' : Timestamp,
     'items' : IDL.Vec(OrderItem),
   });
+  const AuditEntry = IDL.Record({
+    'id' : IDL.Text,
+    'oldValue' : IDL.Opt(IDL.Text),
+    'resourceId' : IDL.Text,
+    'newValue' : IDL.Opt(IDL.Text),
+    'actionType' : IDL.Text,
+    'actorId' : IDL.Text,
+    'resourceType' : IDL.Text,
+    'timestamp' : Timestamp,
+    'details' : IDL.Text,
+  });
   const CommissionSummary = IDL.Record({
     'totalCommission' : IDL.Float64,
     'topProducts' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64)),
     'topSellers' : IDL.Vec(IDL.Tuple(UserId, IDL.Float64)),
     'byPeriod' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64)),
+  });
+  const SellerEarningsByPeriod = IDL.Record({
+    'period' : IDL.Text,
+    'grossRevenue' : IDL.Float64,
+    'netRevenue' : IDL.Float64,
+    'commissionDeducted' : IDL.Float64,
+  });
+  const SellerDashboardSummary = IDL.Record({
+    'totalNetEarnings' : IDL.Float64,
+    'remainingBalance' : IDL.Float64,
+    'totalWithdrawn' : IDL.Float64,
+    'periodLabel' : IDL.Text,
+    'totalGrossRevenue' : IDL.Float64,
+    'totalCommissionDeducted' : IDL.Float64,
+  });
+  const SellerProductStat = IDL.Record({
+    'productId' : IDL.Text,
+    'productName' : IDL.Text,
+    'netRevenue' : IDL.Float64,
+    'salesCount' : IDL.Nat,
+    'totalRevenue' : IDL.Float64,
+    'commissionDeducted' : IDL.Float64,
+  });
+  const ReferralStatus = IDL.Variant({
+    'Invalid' : IDL.Null,
+    'Completed' : IDL.Null,
+    'Pending' : IDL.Null,
+  });
+  const ReferralRecord = IDL.Record({
+    'id' : IDL.Text,
+    'status' : ReferralStatus,
+    'completedAt' : Timestamp,
+    'referrerReward' : IDL.Nat,
+    'code' : IDL.Text,
+    'refereeId' : IDL.Text,
+    'refereeBonus' : IDL.Nat,
+    'referrerId' : IDL.Text,
   });
   const PaymentStatus = IDL.Variant({
     'Approved' : IDL.Null,
@@ -254,6 +433,13 @@ export const idlFactory = ({ IDL }) => {
     'orderId' : IDL.Nat,
     'amount' : IDL.Float64,
     'transactionId' : IDL.Text,
+  });
+  const LeaderboardEntry = IDL.Record({
+    'totalRewardEarned' : IDL.Float64,
+    'totalReferrals' : IDL.Nat,
+    'rank' : IDL.Nat,
+    'lastReferralDate' : IDL.Int,
+    'referrerId' : IDL.Text,
   });
   const SellerWallet = IDL.Record({
     'pendingWithdrawal' : IDL.Float64,
@@ -295,7 +481,15 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
         [],
       ),
+    'checkLoginLockout' : IDL.Func(
+        [IDL.Text],
+        [IDL.Record({ 'locked' : IDL.Bool, 'remainingSecs' : IDL.Int })],
+        ['query'],
+      ),
+    'clearLoginAttempts' : IDL.Func([IDL.Text], [], []),
     'createOrder' : IDL.Func([IDL.Vec(OrderItem)], [Order], []),
+    'createReferralCode' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'generateOtp' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
     'getAdminStats' : IDL.Func(
         [],
         [
@@ -308,6 +502,36 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getAllOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+    'getAllSellerLimits' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64))],
+        ['query'],
+      ),
+    'getAllSellerSuspensions' : IDL.Func(
+        [IDL.Nat, IDL.Nat],
+        [IDL.Vec(AuditEntry)],
+        ['query'],
+      ),
+    'getAuditLog' : IDL.Func(
+        [IDL.Nat, IDL.Nat],
+        [IDL.Vec(AuditEntry)],
+        ['query'],
+      ),
+    'getAuditLogByAction' : IDL.Func(
+        [IDL.Text, IDL.Nat, IDL.Nat],
+        [IDL.Vec(AuditEntry)],
+        ['query'],
+      ),
+    'getAuditLogByActor' : IDL.Func(
+        [IDL.Text, IDL.Nat, IDL.Nat],
+        [IDL.Vec(AuditEntry)],
+        ['query'],
+      ),
+    'getAuditLogByDateRange' : IDL.Func(
+        [IDL.Int, IDL.Int, IDL.Nat, IDL.Nat],
+        [IDL.Vec(AuditEntry)],
+        ['query'],
+      ),
     'getCommissionByMonth' : IDL.Func(
         [IDL.Nat],
         [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64))],
@@ -325,11 +549,45 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Text)],
         ['query'],
       ),
+    'getMyEarningsByPeriod' : IDL.Func(
+        [IDL.Nat, IDL.Text],
+        [IDL.Vec(SellerEarningsByPeriod)],
+        ['query'],
+      ),
+    'getMyEarningsSummary' : IDL.Func(
+        [IDL.Nat],
+        [SellerDashboardSummary],
+        ['query'],
+      ),
     'getMyOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
     'getMyPrincipal' : IDL.Func([], [IDL.Text], ['query']),
+    'getMyProductStats' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Vec(SellerProductStat)],
+        ['query'],
+      ),
+    'getMyReferralEarnings' : IDL.Func([], [IDL.Nat], ['query']),
+    'getMyReferrals' : IDL.Func([], [IDL.Vec(ReferralRecord)], ['query']),
     'getMyRole' : IDL.Func([], [UserRole], ['query']),
+    'getMySellerOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
     'getPayment' : IDL.Func([IDL.Nat], [IDL.Opt(PaymentRecord)], ['query']),
+    'getReferralCode' : IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
+    'getReferralLeaderboard' : IDL.Func(
+        [],
+        [IDL.Vec(LeaderboardEntry)],
+        ['query'],
+      ),
     'getSellerWallet' : IDL.Func([UserId], [IDL.Opt(SellerWallet)], ['query']),
+    'getSellerWithdrawalLimit' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(IDL.Float64)],
+        ['query'],
+      ),
+    'getSuspensionAuditTrail' : IDL.Func(
+        [IDL.Text],
+        [IDL.Vec(AuditEntry)],
+        ['query'],
+      ),
     'getTopProducts' : IDL.Func(
         [IDL.Nat],
         [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64))],
@@ -355,6 +613,8 @@ export const idlFactory = ({ IDL }) => {
     'myPayments' : IDL.Func([], [IDL.Vec(PaymentRecord)], ['query']),
     'myWallet' : IDL.Func([], [SellerWallet], ['query']),
     'myWithdrawals' : IDL.Func([], [IDL.Vec(WithdrawRequest)], ['query']),
+    'processReferral' : IDL.Func([IDL.Text, IDL.Text], [IDL.Bool], []),
+    'recordLoginFailure' : IDL.Func([IDL.Text], [IDL.Nat], []),
     'rejectPayment' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'rejectWithdrawal' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'requestAdminRole' : IDL.Func(
@@ -372,6 +632,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
         [],
       ),
+    'setSellerWithdrawalLimit' : IDL.Func([IDL.Text, IDL.Float64], [], []),
     'setUserProfile' : IDL.Func([IDL.Text], [], []),
     'setupAdminPassword' : IDL.Func(
         [IDL.Text],
@@ -394,6 +655,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'verifyAdminPassword' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
+    'verifyOtp' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
   });
 };
 

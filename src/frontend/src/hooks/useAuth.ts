@@ -1,5 +1,6 @@
-import { useInternetIdentity } from "@caffeineai/core-infrastructure";
+import { useActor, useInternetIdentity } from "@caffeineai/core-infrastructure";
 import { useCallback, useEffect, useState } from "react";
+import { createActor } from "../backend";
 
 export type UserRole = "Customer" | "Seller" | "Admin" | null;
 
@@ -16,7 +17,9 @@ export interface AuthState {
   login: (
     email: string,
     password: string,
-  ) => Promise<{ ok: true } | { err: string }>;
+  ) => Promise<
+    { ok: true } | { err: string; locked?: boolean; remainingSecs?: number }
+  >;
   signup: (
     email: string,
     password: string,
@@ -93,6 +96,7 @@ function saveSession(session: Session | null): void {
 export function useAuth(): AuthState {
   const [session, setSession] = useState<Session | null>(() => loadSession());
   const [isInitializing, setIsInitializing] = useState(true);
+  const { actor } = useActor(createActor);
 
   // Internet Identity (admin flow)
   const {
@@ -113,14 +117,64 @@ export function useAuth(): AuthState {
     async (
       email: string,
       password: string,
-    ): Promise<{ ok: true } | { err: string }> => {
-      const users = loadUsers();
+    ): Promise<
+      { ok: true } | { err: string; locked?: boolean; remainingSecs?: number }
+    > => {
       const normalizedEmail = email.toLowerCase().trim();
+
+      // Check lockout before anything else
+      if (actor) {
+        try {
+          const lockStatus = await actor.checkLoginLockout(normalizedEmail);
+          if (lockStatus.locked) {
+            const secs = Number(lockStatus.remainingSecs);
+            return {
+              err: `Account locked. Try again in ${Math.ceil(secs / 60)} minute${secs >= 120 ? "s" : ""}.`,
+              locked: true,
+              remainingSecs: secs,
+            };
+          }
+        } catch {
+          // Backend unavailable — proceed with local auth
+        }
+      }
+
+      const users = loadUsers();
       const user = users[normalizedEmail];
-      if (!user) return { err: "No account found with that email." };
+
+      if (!user) {
+        // Record failure for unknown email attempts (soft fail)
+        if (actor) {
+          try {
+            await actor.recordLoginFailure(normalizedEmail);
+          } catch {
+            /* noop */
+          }
+        }
+        return { err: "No account found with that email." };
+      }
 
       const hash = await hashPassword(password);
-      if (hash !== user.passwordHash) return { err: "Incorrect password." };
+      if (hash !== user.passwordHash) {
+        // Record failed attempt
+        if (actor) {
+          try {
+            await actor.recordLoginFailure(normalizedEmail);
+          } catch {
+            /* noop */
+          }
+        }
+        return { err: "Incorrect password." };
+      }
+
+      // Success — clear attempts
+      if (actor) {
+        try {
+          await actor.clearLoginAttempts(normalizedEmail);
+        } catch {
+          /* noop */
+        }
+      }
 
       const newSession: Session = {
         email: normalizedEmail,
@@ -131,7 +185,7 @@ export function useAuth(): AuthState {
       setSession(newSession);
       return { ok: true };
     },
-    [],
+    [actor],
   );
 
   const signup = useCallback(

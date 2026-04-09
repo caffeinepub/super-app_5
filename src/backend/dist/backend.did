@@ -31,6 +31,48 @@ type SellerWallet =
    totalEarnings: float64;
    totalWithdrawn: float64;
  };
+type SellerProductStat = 
+ record {
+   commissionDeducted: float64;
+   netRevenue: float64;
+   productId: text;
+   productName: text;
+   salesCount: nat;
+   totalRevenue: float64;
+ };
+type SellerEarningsByPeriod = 
+ record {
+   commissionDeducted: float64;
+   grossRevenue: float64;
+   netRevenue: float64;
+   period: text;
+ };
+type SellerDashboardSummary = 
+ record {
+   periodLabel: text;
+   remainingBalance: float64;
+   totalCommissionDeducted: float64;
+   totalGrossRevenue: float64;
+   totalNetEarnings: float64;
+   totalWithdrawn: float64;
+ };
+type ReferralStatus = 
+ variant {
+   Completed;
+   Invalid;
+   Pending;
+ };
+type ReferralRecord = 
+ record {
+   code: text;
+   completedAt: Timestamp;
+   id: text;
+   refereeBonus: nat;
+   refereeId: text;
+   referrerId: text;
+   referrerReward: nat;
+   status: ReferralStatus;
+ };
 type PaymentStatus = 
  variant {
    Approved;
@@ -77,6 +119,14 @@ type Order =
    total: float64;
    userId: UserId;
  };
+type LeaderboardEntry = 
+ record {
+   lastReferralDate: int;
+   rank: nat;
+   referrerId: text;
+   totalReferrals: nat;
+   totalRewardEarned: float64;
+ };
 type CommissionSummary = 
  record {
    byPeriod: vec record {
@@ -103,6 +153,18 @@ type CommissionRecord =
    sellerId: UserId;
    timestamp: Timestamp;
  };
+type AuditEntry = 
+ record {
+   actionType: text;
+   actorId: text;
+   details: text;
+   id: text;
+   newValue: opt text;
+   oldValue: opt text;
+   resourceId: text;
+   resourceType: text;
+   timestamp: Timestamp;
+ };
 service : {
   approvePayment: (id: nat) -> (bool);
   approveWithdrawal: (id: nat) -> (bool);
@@ -110,7 +172,15 @@ service : {
                                                      err: text;
                                                      ok;
                                                    });
+  checkLoginLockout: (userId: text) ->
+   (record {
+      locked: bool;
+      remainingSecs: int;
+    }) query;
+  clearLoginAttempts: (userId: text) -> ();
   createOrder: (items: vec OrderItem) -> (Order);
+  createReferralCode: (userId: text) -> (text);
+  generateOtp: (userId: text, action: text) -> (text);
   getAdminStats: () ->
    (record {
       newOrders: nat;
@@ -118,6 +188,19 @@ service : {
       pendingWithdrawals: nat;
     }) query;
   getAllOrders: () -> (vec Order) query;
+  getAllSellerLimits: () -> (vec record {
+                                   text;
+                                   float64;
+                                 }) query;
+  getAllSellerSuspensions: (limit: nat, offset: nat) ->
+   (vec AuditEntry) query;
+  getAuditLog: (limit: nat, offset: nat) -> (vec AuditEntry) query;
+  getAuditLogByAction: (actionType: text, limit: nat, offset: nat) ->
+   (vec AuditEntry) query;
+  getAuditLogByActor: (actorId: text, limit: nat, offset: nat) ->
+   (vec AuditEntry) query;
+  getAuditLogByDateRange: (from: int, to: int, limit: nat, offset: nat) ->
+   (vec AuditEntry) query;
   getCommissionByMonth: (months: nat) -> (vec record {
                                                 text;
                                                 float64;
@@ -129,11 +212,22 @@ service : {
   getCommissionSummary: () -> (CommissionSummary) query;
   getFeaturedIds: (category: text) -> (vec text) query;
   getFeaturedIdsByCategory: (category: text) -> (vec text) query;
+  getMyEarningsByPeriod: (days: nat, granularity: text) ->
+   (vec SellerEarningsByPeriod) query;
+  getMyEarningsSummary: (days: nat) -> (SellerDashboardSummary) query;
   getMyOrders: () -> (vec Order) query;
   getMyPrincipal: () -> (text) query;
+  getMyProductStats: (days: nat) -> (vec SellerProductStat) query;
+  getMyReferralEarnings: () -> (nat) query;
+  getMyReferrals: () -> (vec ReferralRecord) query;
   getMyRole: () -> (UserRole) query;
+  getMySellerOrders: () -> (vec Order) query;
   getPayment: (id: nat) -> (opt PaymentRecord) query;
+  getReferralCode: (userId: text) -> (opt text) query;
+  getReferralLeaderboard: () -> (vec LeaderboardEntry) query;
   getSellerWallet: (sellerId: UserId) -> (opt SellerWallet) query;
+  getSellerWithdrawalLimit: (sellerId: text) -> (opt float64) query;
+  getSuspensionAuditTrail: (sellerId: text) -> (vec AuditEntry) query;
   getTopProducts: (limit: nat) -> (vec record {
                                          text;
                                          float64;
@@ -153,6 +247,8 @@ service : {
   myPayments: () -> (vec PaymentRecord) query;
   myWallet: () -> (SellerWallet) query;
   myWithdrawals: () -> (vec WithdrawRequest) query;
+  processReferral: (refereeId: text, referralCode: text) -> (bool);
+  recordLoginFailure: (userId: text) -> (nat);
   rejectPayment: (id: nat) -> (bool);
   rejectWithdrawal: (id: nat) -> (bool);
   requestAdminRole: () -> (variant {
@@ -166,6 +262,7 @@ service : {
       err: text;
       ok;
     });
+  setSellerWithdrawalLimit: (sellerId: text, limit: float64) -> ();
   setUserProfile: (displayName: text) -> ();
   setupAdminPassword: (passwordHash: text) -> (variant {
                                                  err: text;
@@ -184,4 +281,5 @@ service : {
       ok;
     });
   verifyAdminPassword: (passwordHash: text) -> (bool) query;
+  verifyOtp: (userId: text, action: text, code: text) -> (bool);
 }

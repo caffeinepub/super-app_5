@@ -1,26 +1,28 @@
 {
-  "overview": "A full-featured Super App for Bangladesh with Shop, Delivery, and Service categories. Features advanced commission tracking (10% auto-deduction), bKash/Nagad payment integration with admin verification, seller wallet system with withdrawal requests, analytics with 12-month charts, and a deep colorful admin dashboard.",
+  "overview": "Super App is a full-featured marketplace and service platform for the Bangladesh market with commission tracking, seller wallets, referral rewards, bKash/Nagad payments, and a deep colorful modern design.",
   "features": [
-    "Commission tracking with 10% auto-deduction from all orders",
-    "bKash & Nagad manual payment with transaction ID verification",
-    "Seller wallet system with earnings tracking and withdrawal requests",
-    "Analytics dashboard with 12-month charts and daily/weekly/monthly filters",
-    "Admin panel with Commission Dashboard, Payment Verification, and Withdrawal Management tabs",
-    "Deep colorful modern UI with gradient cards and highlight stats",
-    "Notification badges for pending payments, withdrawals, and new orders",
-    "Role-based access control with Internet Identity for admins"
+    "Home screen logo support (192x192 & 512x512)",
+    "Referral leaderboard showing top inviters",
+    "Custom per-seller withdrawal limits",
+    "Seller suspension audit trail with full history",
+    "Referral rewards with wallet bonuses",
+    "Seller wallet with bKash/Nagad withdrawals",
+    "Admin audit logs (immutable, 12+ months)",
+    "OTP verification for sensitive actions",
+    "Login lockout after 5 failed attempts",
+    "10% commission tracking with analytics",
+    "bKash and Nagad payment integration"
   ],
-  "category": "ecommerce",
+  "category": "marketplace",
   "tags": [
-    "super-app",
+    "marketplace",
     "ecommerce",
-    "commission",
-    "bkash",
-    "nagad",
     "bangladesh",
-    "seller-wallet",
-    "analytics",
-    "admin-panel"
+    "referral",
+    "commission",
+    "seller-dashboard",
+    "admin-panel",
+    "mobile-first"
   ],
-  "last_updated": "2026-04-08T17:30:06.976Z"
+  "last_updated": "2026-04-09T08:17:04.915Z"
 }

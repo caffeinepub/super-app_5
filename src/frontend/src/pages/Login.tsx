@@ -9,8 +9,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useRouter } from "@tanstack/react-router";
-import { Eye, EyeOff, LogIn, ShieldAlert } from "lucide-react";
-import { useState } from "react";
+import { Eye, EyeOff, Lock, LogIn, ShieldAlert, Timer } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 
 export function LoginPage() {
@@ -22,14 +22,52 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockCountdown, setLockCountdown] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Countdown timer for lockout
+  useEffect(() => {
+    if (lockCountdown > 0) {
+      setIsLocked(true);
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = setInterval(() => {
+        setLockCountdown((prev) => {
+          if (prev <= 1) {
+            if (timerRef.current) clearInterval(timerRef.current);
+            setIsLocked(false);
+            setError("");
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [lockCountdown]);
+
+  function formatCountdown(secs: number) {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    if (m > 0) return `${m}m ${String(s).padStart(2, "0")}s`;
+    return `${s}s`;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLocked) return;
+
     setError("");
     setIsSubmitting(true);
     const result = await login(email, password);
     setIsSubmitting(false);
+
     if ("err" in result) {
+      if (result.locked && result.remainingSecs) {
+        setLockCountdown(result.remainingSecs);
+      }
       setError(result.err);
     } else {
       void router.navigate({ to: "/" });
@@ -73,12 +111,13 @@ export function LoginPage() {
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
-                    setError("");
+                    if (!isLocked) setError("");
                   }}
                   placeholder="you@example.com"
                   autoComplete="email"
                   required
                   autoFocus
+                  disabled={isLocked}
                   data-ocid="login-email"
                 />
               </div>
@@ -94,12 +133,13 @@ export function LoginPage() {
                     value={password}
                     onChange={(e) => {
                       setPassword(e.target.value);
-                      setError("");
+                      if (!isLocked) setError("");
                     }}
                     placeholder="Enter your password"
                     autoComplete="current-password"
                     required
                     className="pr-10"
+                    disabled={isLocked}
                     data-ocid="login-password"
                   />
                   <button
@@ -115,7 +155,35 @@ export function LoginPage() {
                 </div>
               </div>
 
-              {error && (
+              {/* Lockout banner */}
+              {isLocked && (
+                <div
+                  className="flex flex-col gap-2 rounded-xl bg-destructive/10 border border-destructive/30 px-4 py-3"
+                  role="alert"
+                  data-ocid="login-lockout-banner"
+                >
+                  <div className="flex items-center gap-2 text-sm font-semibold text-destructive">
+                    <Lock size={15} />
+                    Account temporarily locked
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-destructive/80">
+                    <Timer size={14} />
+                    <span>
+                      Try again in{" "}
+                      <span className="font-mono font-bold text-destructive">
+                        {formatCountdown(lockCountdown)}
+                      </span>
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Too many failed attempts. Your account has been locked for
+                    15 minutes for security.
+                  </p>
+                </div>
+              )}
+
+              {/* Generic error (non-lockout) */}
+              {error && !isLocked && (
                 <div
                   className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2"
                   role="alert"
@@ -130,10 +198,15 @@ export function LoginPage() {
                 type="submit"
                 form="login-form"
                 className="w-full"
-                disabled={isSubmitting || !email || !password}
+                disabled={isSubmitting || !email || !password || isLocked}
                 data-ocid="login-submit"
               >
-                {isSubmitting ? (
+                {isLocked ? (
+                  <span className="flex items-center gap-2">
+                    <Lock size={16} />
+                    Locked — {formatCountdown(lockCountdown)}
+                  </span>
+                ) : isSubmitting ? (
                   <span className="flex items-center gap-2">
                     <span className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                     Signing in…

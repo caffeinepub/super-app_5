@@ -1,0 +1,25 @@
+{
+  "name": "Super App",
+  "short_name": "Super App",
+  "description": "Shop, get deliveries, and book services — all in one place.",
+  "icons": [
+    {
+      "src": "/logo192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "theme_color": "#7c3aed",
+  "background_color": "#0f0f1a",
+  "display": "standalone",
+  "orientation": "portrait",
+  "start_url": "/",
+  "scope": "/"
+}

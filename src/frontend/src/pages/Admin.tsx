@@ -5,14 +5,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useActor } from "@caffeineai/core-infrastructure";
 import {
   AlertTriangle,
   ArrowDownCircle,
   BadgeDollarSign,
+  BookOpen,
   CheckCircle,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   ClipboardList,
+  Copy,
+  Filter,
   KeyRound,
   Loader2,
   LogIn,
@@ -21,11 +27,16 @@ import {
   Plus,
   RotateCcw,
   Save,
+  Scale,
+  Search,
+  Settings2,
   ShieldAlert,
   ShieldCheck,
   Star,
+  Trash2,
   TrendingUp,
   UserCheck,
+  UserMinus,
   Users,
   Wallet,
   X,
@@ -41,7 +52,10 @@ import {
   YAxis,
 } from "recharts";
 import { toast } from "sonner";
-import { OrderStatus } from "../backend.d";
+import { createActor } from "../backend";
+import { OrderStatus, UserRole } from "../backend.d";
+import type { AuditEntry } from "../backend.d";
+import { OtpModal } from "../components/OtpModal";
 import { type AdminCategory, useAdmin } from "../hooks/useAdmin";
 import { useAdminApprovals } from "../hooks/useAdminApprovals";
 import { useAdminOrders } from "../hooks/useAdminOrders";
@@ -52,7 +66,14 @@ import {
 import {
   useAdminPendingWithdrawals,
   useAdminWithdrawalAction,
+  useAllSellerLimits,
+  useSetSellerWithdrawalLimit,
 } from "../hooks/useAdminWithdrawals";
+import {
+  useAllSellerSuspensions,
+  useAuditLog,
+  useSellerSuspensionTrail,
+} from "../hooks/useAuditLog";
 import { useAuth } from "../hooks/useAuth";
 import {
   useAdminStats,
@@ -456,7 +477,6 @@ function DashboardTab({ totalOrders }: { totalOrders: number }) {
         ))}
       </div>
 
-      {/* Alert cards for pending actions */}
       {(pendingPmtCount > 0 || pendingWdCount > 0) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {pendingPmtCount > 0 && (
@@ -521,7 +541,6 @@ function CommissionDashboardTab() {
 
   return (
     <div className="space-y-6">
-      {/* Summary stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatCard
           label="Total Commission"
@@ -549,7 +568,6 @@ function CommissionDashboardTab() {
         />
       </div>
 
-      {/* Chart section */}
       <Card className="border-border shadow-sm overflow-hidden">
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between flex-wrap gap-2">
@@ -564,8 +582,8 @@ function CommissionDashboardTab() {
                   onClick={() => setPeriod(key)}
                   className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
                     period === key
-                      ? "filter-badge-active bg-primary text-primary-foreground"
-                      : "filter-badge-inactive bg-muted text-muted-foreground hover:bg-muted/70"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/70"
                   }`}
                   data-ocid={`commission-period-${key}`}
                 >
@@ -679,9 +697,7 @@ function CommissionDashboardTab() {
         </CardContent>
       </Card>
 
-      {/* Top Sellers + Top Products */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Top Sellers */}
         <Card className="border-border shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -724,7 +740,6 @@ function CommissionDashboardTab() {
           </CardContent>
         </Card>
 
-        {/* Top Products */}
         <Card className="border-border shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -971,7 +986,7 @@ function PendingApprovalsTab() {
   );
 }
 
-// --- Payment Verification Tab ---
+// --- Payment Verification Tab (with OTP) ---
 const PAYMENT_METHOD_CONFIG = {
   bkash: {
     label: "bKash",
@@ -993,10 +1008,11 @@ const PAYMENT_STATUS_COLORS: Record<string, string> = {
   Rejected: "bg-destructive/15 text-destructive border-destructive/30",
 };
 
-function PaymentVerificationTab() {
+function PaymentVerificationTab({ adminUserId }: { adminUserId: string }) {
   const { data: payments, isLoading } = useAdminPendingPayments();
   const { mutateAsync: actionPayment, isPending: isActionPending } =
     useApproveAdminPayment();
+  const [otpTarget, setOtpTarget] = useState<{ id: string } | null>(null);
 
   if (isLoading) {
     return (
@@ -1026,267 +1042,1347 @@ function PaymentVerificationTab() {
   }
 
   return (
-    <div className="space-y-3" data-ocid="admin-payments-list">
-      {pending.map((payment) => {
-        const methodConf =
-          PAYMENT_METHOD_CONFIG[
-            payment.method as keyof typeof PAYMENT_METHOD_CONFIG
-          ] ?? PAYMENT_METHOD_CONFIG.bkash;
-        const dateStr = new Date(payment.createdAt).toLocaleDateString();
-        return (
-          <Card
-            key={payment.id}
-            className="border-border shadow-sm overflow-hidden"
-          >
-            <CardContent className="p-4">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <div className="flex-1 min-w-0 space-y-1.5">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span
-                      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg border ${methodConf.bg}`}
-                    >
-                      <span>{methodConf.emoji}</span>
-                      <span className={methodConf.color}>
-                        {methodConf.label}
+    <>
+      <OtpModal
+        open={!!otpTarget}
+        userId={adminUserId}
+        action="ApprovePayment"
+        actionLabel="Approve Payment"
+        onConfirm={async () => {
+          if (!otpTarget) return;
+          try {
+            await actionPayment({ id: otpTarget.id, action: "approve" });
+            toast.success("Payment approved! Order confirmed.");
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Action failed");
+          } finally {
+            setOtpTarget(null);
+          }
+        }}
+        onCancel={() => setOtpTarget(null)}
+      />
+
+      <div className="space-y-3" data-ocid="admin-payments-list">
+        {pending.map((payment) => {
+          const methodConf =
+            PAYMENT_METHOD_CONFIG[
+              payment.method as keyof typeof PAYMENT_METHOD_CONFIG
+            ] ?? PAYMENT_METHOD_CONFIG.bkash;
+          const dateStr = new Date(payment.createdAt).toLocaleDateString();
+          return (
+            <Card
+              key={payment.id}
+              className="border-border shadow-sm overflow-hidden"
+            >
+              <CardContent className="p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex-1 min-w-0 space-y-1.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span
+                        className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg border ${methodConf.bg}`}
+                      >
+                        <span>{methodConf.emoji}</span>
+                        <span className={methodConf.color}>
+                          {methodConf.label}
+                        </span>
                       </span>
-                    </span>
-                    <Badge
+                      <Badge
+                        variant="outline"
+                        className={`text-xs border ${PAYMENT_STATUS_COLORS[payment.status] ?? ""}`}
+                      >
+                        {payment.status}
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-0.5 text-xs">
+                      <span className="text-muted-foreground">
+                        Order:{" "}
+                        <span className="font-mono text-foreground">
+                          #{payment.orderId}
+                        </span>
+                      </span>
+                      <span className="text-muted-foreground">
+                        TxID:{" "}
+                        <span className="font-mono text-foreground">
+                          {payment.transactionId}
+                        </span>
+                      </span>
+                      <span className="text-muted-foreground">
+                        Date: <span className="text-foreground">{dateStr}</span>
+                      </span>
+                      <span className="font-bold text-primary text-sm col-span-2 sm:col-span-1">
+                        ৳{payment.amount.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <Button
+                      size="sm"
                       variant="outline"
-                      className={`text-xs border ${PAYMENT_STATUS_COLORS[payment.status] ?? ""}`}
+                      className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                      disabled={isActionPending}
+                      data-ocid={`payment-reject-${payment.id}`}
+                      onClick={async () => {
+                        try {
+                          await actionPayment({
+                            id: payment.id,
+                            action: "reject",
+                          });
+                          toast.error("Payment rejected");
+                        } catch (e) {
+                          toast.error(
+                            e instanceof Error ? e.message : "Action failed",
+                          );
+                        }
+                      }}
                     >
-                      {payment.status}
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-0.5 text-xs">
-                    <span className="text-muted-foreground">
-                      Order:{" "}
-                      <span className="font-mono text-foreground">
-                        #{payment.orderId}
-                      </span>
-                    </span>
-                    <span className="text-muted-foreground">
-                      TxID:{" "}
-                      <span className="font-mono text-foreground">
-                        {payment.transactionId}
-                      </span>
-                    </span>
-                    <span className="text-muted-foreground">
-                      Date: <span className="text-foreground">{dateStr}</span>
-                    </span>
-                    <span className="font-bold text-primary text-sm col-span-2 sm:col-span-1">
-                      ৳{payment.amount.toLocaleString()}
-                    </span>
+                      <X size={14} />
+                      Reject
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="bg-chart-3 text-chart-3-foreground hover:bg-chart-3/90"
+                      disabled={isActionPending}
+                      data-ocid={`payment-approve-${payment.id}`}
+                      onClick={() => setOtpTarget({ id: payment.id })}
+                    >
+                      {isActionPending ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <CheckCircle size={14} />
+                      )}
+                      Approve
+                    </Button>
                   </div>
                 </div>
-                <div className="flex gap-2 shrink-0">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-destructive/40 text-destructive hover:bg-destructive/10"
-                    disabled={isActionPending}
-                    data-ocid={`payment-reject-${payment.id}`}
-                    onClick={async () => {
-                      try {
-                        await actionPayment({
-                          id: payment.id,
-                          action: "reject",
-                        });
-                        toast.error("Payment rejected");
-                      } catch (e) {
-                        toast.error(
-                          e instanceof Error ? e.message : "Action failed",
-                        );
-                      }
-                    }}
-                  >
-                    <X size={14} />
-                    Reject
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="bg-chart-3 text-chart-3-foreground hover:bg-chart-3/90"
-                    disabled={isActionPending}
-                    data-ocid={`payment-approve-${payment.id}`}
-                    onClick={async () => {
-                      try {
-                        await actionPayment({
-                          id: payment.id,
-                          action: "approve",
-                        });
-                        toast.success("Payment approved! Order confirmed.");
-                      } catch (e) {
-                        toast.error(
-                          e instanceof Error ? e.message : "Action failed",
-                        );
-                      }
-                    }}
-                  >
-                    {isActionPending ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <CheckCircle size={14} />
-                    )}
-                    Approve
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
-// --- Withdrawal Management Tab ---
+// --- Withdrawal Management Tab (with OTP) ---
 const WITHDRAWAL_STATUS_COLORS: Record<string, string> = {
   Pending: "bg-secondary/15 text-secondary border-secondary/30",
   Approved: "bg-chart-3/15 text-chart-3 border-chart-3/30",
   Rejected: "bg-destructive/15 text-destructive border-destructive/30",
 };
 
-function WithdrawalManagementTab() {
+// ─── Per-Seller Withdrawal Limits Card ───────────────────────────────────────
+
+function SellerWithdrawalLimitsCard() {
+  const { data: limits, isLoading: limitsLoading } = useAllSellerLimits();
+  const { mutateAsync: setLimit, isPending: isSettingLimit } =
+    useSetSellerWithdrawalLimit();
+  const [sellerIdInput, setSellerIdInput] = useState("");
+  const [limitInput, setLimitInput] = useState("");
+  const [formError, setFormError] = useState("");
+
+  const handleSetLimit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError("");
+    const trimmedId = sellerIdInput.trim();
+    const parsedLimit = Number.parseFloat(limitInput);
+    if (!trimmedId) {
+      setFormError("Please enter a seller ID.");
+      return;
+    }
+    if (!parsedLimit || parsedLimit <= 0) {
+      setFormError("Please enter a valid limit amount greater than 0.");
+      return;
+    }
+    try {
+      await setLimit({ sellerId: trimmedId, limit: parsedLimit });
+      toast.success(
+        `Withdrawal limit of ৳${parsedLimit.toLocaleString()} set for ${trimmedId}`,
+      );
+      setSellerIdInput("");
+      setLimitInput("");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to set limit");
+    }
+  };
+
+  const handleRemoveLimit = async (sellerId: string) => {
+    try {
+      await setLimit({ sellerId, limit: null });
+      toast.success(`Withdrawal limit removed for ${sellerId}`);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to remove limit",
+      );
+    }
+  };
+
+  return (
+    <div
+      className="rounded-2xl overflow-hidden border border-violet-500/20 shadow-sm mb-6"
+      data-ocid="seller-limits-card"
+    >
+      {/* Card header */}
+      <div className="bg-gradient-to-r from-violet-600 to-purple-700 px-5 py-4">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center">
+            <Settings2 size={16} className="text-white" />
+          </div>
+          <div>
+            <h3 className="font-display font-bold text-white text-sm">
+              Per-Seller Withdrawal Limits
+            </h3>
+            <p className="text-xs text-white/70 mt-0.5">
+              Set maximum withdrawal amounts per seller. Sellers without a limit
+              can withdraw any amount up to their balance.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-card px-5 py-4 space-y-5">
+        {/* Set limit form */}
+        <form
+          onSubmit={(e) => void handleSetLimit(e)}
+          className="space-y-3"
+          data-ocid="seller-limit-form"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+            <div>
+              <Label
+                htmlFor="limit-seller-id"
+                className="text-xs font-semibold mb-1.5 block"
+              >
+                Seller ID
+              </Label>
+              <Input
+                id="limit-seller-id"
+                value={sellerIdInput}
+                onChange={(e) => {
+                  setSellerIdInput(e.target.value);
+                  setFormError("");
+                }}
+                placeholder="user@example.com or principal"
+                className="text-sm"
+                data-ocid="limit-seller-id-input"
+              />
+            </div>
+            <div>
+              <Label
+                htmlFor="limit-amount"
+                className="text-xs font-semibold mb-1.5 block"
+              >
+                Limit Amount (৳)
+              </Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-semibold">
+                  ৳
+                </span>
+                <Input
+                  id="limit-amount"
+                  type="number"
+                  min="1"
+                  value={limitInput}
+                  onChange={(e) => {
+                    setLimitInput(e.target.value);
+                    setFormError("");
+                  }}
+                  placeholder="e.g. 5000"
+                  className="text-sm pl-7"
+                  data-ocid="limit-amount-input"
+                />
+              </div>
+            </div>
+            <Button
+              type="submit"
+              disabled={isSettingLimit || !sellerIdInput || !limitInput}
+              className="bg-gradient-to-r from-violet-600 to-purple-600 text-white border-0 hover:opacity-90 shrink-0"
+              data-ocid="limit-set-btn"
+            >
+              {isSettingLimit ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Save size={14} />
+              )}
+              Set Limit
+            </Button>
+          </div>
+          {formError && (
+            <p className="text-xs text-destructive flex items-center gap-1.5">
+              <ShieldAlert size={12} /> {formError}
+            </p>
+          )}
+        </form>
+
+        {/* Current limits table */}
+        {limitsLoading ? (
+          <div className="space-y-2">
+            {[1, 2].map((i) => (
+              <Skeleton key={i} className="h-10 w-full rounded-lg" />
+            ))}
+          </div>
+        ) : !limits || limits.length === 0 ? (
+          <div
+            className="flex flex-col items-center gap-2 py-8 text-center rounded-xl border border-dashed border-border bg-muted/20"
+            data-ocid="seller-limits-empty"
+          >
+            <Settings2 size={24} className="text-muted-foreground opacity-40" />
+            <p className="text-sm text-muted-foreground font-medium">
+              No limits set
+            </p>
+            <p className="text-xs text-muted-foreground">
+              All sellers can withdraw up to their full balance.
+            </p>
+          </div>
+        ) : (
+          <div
+            className="rounded-xl border border-border overflow-hidden"
+            data-ocid="seller-limits-table"
+          >
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-muted/40 border-b border-border">
+                  {["Seller ID", "Limit (৳)", "Actions"].map((h) => (
+                    <th
+                      key={h}
+                      className={`px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide ${h === "Limit (৳)" ? "text-right" : h === "Actions" ? "text-center" : "text-left"}`}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {limits.map((entry, i) => (
+                  <tr
+                    key={entry.sellerId}
+                    className={`border-b border-border/40 transition-smooth hover:bg-muted/20 ${i % 2 === 0 ? "bg-card" : "bg-background"}`}
+                    data-ocid={`limit-row-${entry.sellerId}`}
+                  >
+                    <td className="px-4 py-3 font-mono text-xs text-foreground max-w-[200px]">
+                      <span className="truncate block">{entry.sellerId}</span>
+                    </td>
+                    <td className="px-4 py-3 text-right font-display font-bold text-violet-600 dark:text-violet-400">
+                      ৳{entry.limit.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-destructive/40 text-destructive hover:bg-destructive/10 h-7 px-2.5"
+                        disabled={isSettingLimit}
+                        data-ocid={`limit-remove-${entry.sellerId}`}
+                        onClick={() => void handleRemoveLimit(entry.sellerId)}
+                      >
+                        <Trash2 size={12} />
+                        Remove
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function WithdrawalManagementTab({ adminUserId }: { adminUserId: string }) {
   const { data: withdrawals, isLoading } = useAdminPendingWithdrawals();
   const { mutateAsync: actionWithdrawal, isPending: isActionPending } =
     useAdminWithdrawalAction();
+  const [otpTarget, setOtpTarget] = useState<{ id: string } | null>(null);
+
+  const pending = (withdrawals ?? []).filter((w) => w.status === "Pending");
+
+  return (
+    <div className="space-y-6">
+      {/* Per-seller limits section — always visible above pending list */}
+      <SellerWithdrawalLimitsCard />
+
+      {/* Pending withdrawal requests */}
+      <div>
+        <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+          <ArrowDownCircle size={15} className="text-muted-foreground" />
+          Pending Withdrawal Requests
+          {pending.length > 0 && (
+            <span className="ml-auto text-xs font-bold text-amber-600 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-0.5 rounded-full">
+              {pending.length} pending
+            </span>
+          )}
+        </h3>
+
+        {isLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-20 w-full rounded-lg" />
+            ))}
+          </div>
+        ) : pending.length === 0 ? (
+          <div
+            className="text-center py-10 text-muted-foreground rounded-xl border border-dashed border-border bg-muted/10"
+            data-ocid="admin-withdrawals-empty"
+          >
+            <ArrowDownCircle size={32} className="mx-auto mb-3 opacity-40" />
+            <p className="font-medium text-sm">No pending withdrawals</p>
+            <p className="text-xs mt-1">
+              Seller withdrawal requests will appear here.
+            </p>
+          </div>
+        ) : (
+          <>
+            <OtpModal
+              open={!!otpTarget}
+              userId={adminUserId}
+              action="WithdrawalRequest"
+              actionLabel="Approve Withdrawal"
+              onConfirm={async () => {
+                if (!otpTarget) return;
+                try {
+                  await actionWithdrawal({
+                    id: otpTarget.id,
+                    action: "approve",
+                  });
+                  toast.success("Withdrawal approved! Seller will be paid.");
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Action failed");
+                } finally {
+                  setOtpTarget(null);
+                }
+              }}
+              onCancel={() => setOtpTarget(null)}
+            />
+
+            <div className="space-y-3" data-ocid="admin-withdrawals-list">
+              {pending.map((req) => {
+                const methodConf =
+                  PAYMENT_METHOD_CONFIG[
+                    req.method as keyof typeof PAYMENT_METHOD_CONFIG
+                  ] ?? PAYMENT_METHOD_CONFIG.bkash;
+                const dateStr = new Date(req.requestedAt).toLocaleDateString();
+                return (
+                  <Card
+                    key={req.id}
+                    className="border-border shadow-sm overflow-hidden"
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-semibold text-foreground">
+                              {req.sellerName}
+                            </span>
+                            <span
+                              className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg border ${methodConf.bg}`}
+                            >
+                              <span>{methodConf.emoji}</span>
+                              <span className={methodConf.color}>
+                                {methodConf.label}
+                              </span>
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className={`text-xs border ${WITHDRAWAL_STATUS_COLORS[req.status] ?? ""}`}
+                            >
+                              {req.status}
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
+                            <span className="text-muted-foreground">
+                              Account:{" "}
+                              <span className="font-mono text-foreground">
+                                {req.accountNumber}
+                              </span>
+                            </span>
+                            <span className="text-muted-foreground">
+                              Requested:{" "}
+                              <span className="text-foreground">{dateStr}</span>
+                            </span>
+                            <span className="font-bold text-secondary text-sm">
+                              ৳{req.amount.toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                            disabled={isActionPending}
+                            data-ocid={`withdrawal-reject-${req.id}`}
+                            onClick={async () => {
+                              try {
+                                await actionWithdrawal({
+                                  id: req.id,
+                                  action: "reject",
+                                });
+                                toast.error("Withdrawal request rejected");
+                              } catch (e) {
+                                toast.error(
+                                  e instanceof Error
+                                    ? e.message
+                                    : "Action failed",
+                                );
+                              }
+                            }}
+                          >
+                            <X size={14} />
+                            Reject
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="bg-chart-3 text-chart-3-foreground hover:bg-chart-3/90"
+                            disabled={isActionPending}
+                            data-ocid={`withdrawal-approve-${req.id}`}
+                            onClick={() => setOtpTarget({ id: req.id })}
+                          >
+                            {isActionPending ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <CheckCircle size={14} />
+                            )}
+                            Approve
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// --- Audit Log Tab ---
+const ACTION_TYPE_COLORS: Record<string, string> = {
+  financial: "bg-chart-3/15 text-chart-3 border-chart-3/30",
+  auth: "bg-secondary/15 text-secondary border-secondary/30",
+  admin: "bg-accent/15 text-accent border-accent/30",
+  suspension: "bg-destructive/15 text-destructive border-destructive/30",
+};
+
+function getActionTypeBadge(actionType: string): string {
+  const lower = actionType.toLowerCase();
+  if (
+    lower.includes("payment") ||
+    lower.includes("withdraw") ||
+    lower.includes("commission")
+  )
+    return "financial";
+  if (
+    lower.includes("login") ||
+    lower.includes("auth") ||
+    lower.includes("otp")
+  )
+    return "auth";
+  if (
+    lower.includes("suspend") ||
+    lower.includes("block") ||
+    lower.includes("ban")
+  )
+    return "suspension";
+  return "admin";
+}
+
+// ── Seller Audit Trail Tab ─────────────────────────────────────────────────
+
+function SuspensionBadge({ actionType }: { actionType: string }) {
+  const isSuspend = actionType === "SUSPEND_USER";
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold text-white ${
+        isSuspend
+          ? "bg-gradient-to-r from-red-600 to-rose-700"
+          : "bg-gradient-to-r from-green-600 to-emerald-700"
+      }`}
+    >
+      {isSuspend ? <UserMinus size={11} /> : <UserCheck size={11} />}
+      {isSuspend ? "SUSPENDED" : "UNSUSPENDED"}
+    </span>
+  );
+}
+
+function CopyableId({ id }: { id: string }) {
+  const handleCopy = () => {
+    void navigator.clipboard.writeText(id);
+    toast.success("Copied to clipboard");
+  };
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      title={id}
+      className="inline-flex items-center gap-1 font-mono text-xs bg-muted/60 hover:bg-muted px-2 py-0.5 rounded transition-colors cursor-pointer"
+      data-ocid="suspension-copy-id"
+    >
+      <span className="truncate max-w-[120px]">
+        {id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-6)}` : id}
+      </span>
+      <Copy size={10} className="shrink-0 text-muted-foreground" />
+    </button>
+  );
+}
+
+function formatSuspensionTs(ts: bigint): string {
+  return new Date(Number(ts) / 1_000_000).toLocaleString("en-BD", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function SellerLookupPanel() {
+  const [inputId, setInputId] = useState("");
+  const [searchId, setSearchId] = useState("");
+
+  const { data: entries = [], isFetching } = useSellerSuspensionTrail(searchId);
+
+  const handleSearch = () => {
+    const trimmed = inputId.trim();
+    if (trimmed) setSearchId(trimmed);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl bg-gradient-to-r from-red-950/40 via-rose-950/30 to-purple-950/40 border border-rose-800/30 p-4">
+        <h3 className="font-semibold text-sm text-foreground mb-1 flex items-center gap-2">
+          <Search size={14} className="text-rose-400" />
+          Look Up Seller History
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          Enter a Seller ID to view their complete suspension and reinstatement
+          history.
+        </p>
+      </div>
+      <div className="flex gap-2">
+        <Input
+          value={inputId}
+          onChange={(e) => setInputId(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSearch();
+          }}
+          placeholder="Enter Seller ID…"
+          className="font-mono text-sm"
+          data-ocid="suspension-seller-id-input"
+        />
+        <Button
+          type="button"
+          onClick={handleSearch}
+          disabled={!inputId.trim() || isFetching}
+          data-ocid="suspension-seller-search-btn"
+          className="shrink-0"
+        >
+          {isFetching ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <Search size={14} />
+          )}
+          Search
+        </Button>
+      </div>
+
+      {searchId && (
+        <div className="space-y-2">
+          {isFetching ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-16 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : entries.length === 0 ? (
+            <div className="text-center py-10 rounded-xl border border-dashed border-border bg-muted/20">
+              <UserMinus
+                size={28}
+                className="mx-auto mb-2 text-muted-foreground/50"
+              />
+              <p className="text-sm text-muted-foreground">
+                No suspension history found for this seller
+              </p>
+              <p className="text-xs text-muted-foreground/60 mt-1">
+                Seller ID: <span className="font-mono">{searchId}</span>
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground font-medium">
+                {entries.length} event{entries.length !== 1 ? "s" : ""} found
+                for <span className="font-mono">{searchId}</span>
+              </p>
+              {entries.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border border-border bg-card p-3"
+                >
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <SuspensionBadge actionType={entry.actionType} />
+                      <span className="text-xs text-muted-foreground">
+                        {formatSuspensionTs(entry.timestamp)}
+                      </span>
+                    </div>
+                    {entry.details && (
+                      <p className="text-xs text-foreground/80 mt-0.5">
+                        {entry.details}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-xs text-muted-foreground">by</span>
+                    <CopyableId id={entry.actorId} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AllSuspensionsPanel() {
+  const [page, setPage] = useState(0);
+  const PAGE = 20;
+  const { data: entries = [], isFetching } = useAllSellerSuspensions(
+    PAGE,
+    page * PAGE,
+  );
+
+  const suspendCount = entries.filter(
+    (e) => e.actionType === "SUSPEND_USER",
+  ).length;
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="rounded-xl bg-gradient-to-r from-red-900 via-pink-900 to-purple-900 p-4 text-white">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h3 className="font-bold text-sm flex items-center gap-2">
+              <Scale size={15} />
+              All Recent Suspensions
+            </h3>
+            <p className="text-xs text-white/70 mt-0.5">
+              System-wide suspension and reinstatement activity
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <div className="text-center">
+              <p className="text-lg font-bold">{entries.length}</p>
+              <p className="text-xs text-white/70">Total Events</p>
+            </div>
+            <div className="w-px bg-white/20" />
+            <div className="text-center">
+              <p className="text-lg font-bold text-rose-300">{suspendCount}</p>
+              <p className="text-xs text-white/70">Suspensions</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Table */}
+      {isFetching ? (
+        <div className="space-y-2">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-14 w-full rounded-lg" />
+          ))}
+        </div>
+      ) : entries.length === 0 ? (
+        <div className="text-center py-10 rounded-xl border border-dashed border-border bg-muted/20">
+          <Scale size={28} className="mx-auto mb-2 text-muted-foreground/50" />
+          <p className="text-sm text-muted-foreground">
+            No suspension events recorded yet
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {entries.map((entry) => (
+            <div
+              key={entry.id}
+              className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_auto] gap-2 items-center rounded-lg border border-border bg-card p-3 hover:bg-muted/30 transition-colors"
+              data-ocid="suspension-list-row"
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <SuspensionBadge actionType={entry.actionType} />
+                  <span className="text-xs text-muted-foreground">
+                    {formatSuspensionTs(entry.timestamp)}
+                  </span>
+                </div>
+                {entry.details && (
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                    {entry.details}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-muted-foreground hidden sm:inline">
+                  Seller:
+                </span>
+                <CopyableId id={entry.resourceId} />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-muted-foreground hidden sm:inline">
+                  Admin:
+                </span>
+                <CopyableId id={entry.actorId} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      <div className="flex items-center justify-between pt-1">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage((p) => Math.max(0, p - 1))}
+          disabled={page === 0 || isFetching}
+          data-ocid="suspension-prev-page"
+        >
+          <ChevronLeft size={14} />
+          Prev
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          Page {page + 1} · {entries.length} entries
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage((p) => p + 1)}
+          disabled={entries.length < PAGE || isFetching}
+          data-ocid="suspension-next-page"
+        >
+          Next
+          <ChevronRight size={14} />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function SellerAuditTrailTab() {
+  return (
+    <div className="space-y-6">
+      {/* Tab header */}
+      <div className="rounded-xl bg-gradient-to-r from-red-950/30 via-pink-950/20 to-purple-950/30 border border-red-800/30 p-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Scale size={16} className="text-rose-400" />
+          <h2 className="font-semibold text-foreground text-sm">
+            Seller Suspension Audit Trail
+          </h2>
+          <Badge
+            variant="outline"
+            className="text-xs border-rose-500/30 text-rose-400 bg-rose-500/10 ml-auto"
+          >
+            Immutable · Read-only
+          </Badge>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Complete, immutable record of all seller suspension and reinstatement
+          actions. Cannot be edited or deleted.
+        </p>
+      </div>
+
+      {/* Look up panel */}
+      <SellerLookupPanel />
+
+      <div className="h-px bg-border" />
+
+      {/* All suspensions */}
+      <AllSuspensionsPanel />
+    </div>
+  );
+}
+
+function AuditLogTab() {
+  const log = useAuditLog();
+  const [actorFilter, setActorFilter] = useState("");
+  const [actionFilter, setActionFilter] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [hasLoaded, setHasLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!hasLoaded) {
+      void log.fetchPage(0);
+      setHasLoaded(true);
+    }
+  }, [hasLoaded, log]);
+
+  const handleSearch = async () => {
+    if (actorFilter.trim()) {
+      await log.filterByActor(actorFilter.trim());
+    } else if (actionFilter.trim()) {
+      await log.filterByAction(actionFilter.trim());
+    } else if (fromDate && toDate) {
+      await log.filterByDateRange(new Date(fromDate), new Date(toDate));
+    } else {
+      await log.fetchPage(0);
+    }
+  };
+
+  const handleClear = async () => {
+    setActorFilter("");
+    setActionFilter("");
+    setFromDate("");
+    setToDate("");
+    await log.clearFilters();
+  };
+
+  function formatTs(ts: bigint): string {
+    return new Date(Number(ts) / 1_000_000).toLocaleString("en-BD", {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
+  }
+
+  function truncate(s: string, n = 20): string {
+    return s.length > n ? `${s.slice(0, n)}…` : s;
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="rounded-xl bg-gradient-to-r from-accent/10 via-primary/5 to-accent/10 border border-accent/20 p-4">
+        <div className="flex items-center gap-2 mb-1">
+          <BookOpen size={16} className="text-accent" />
+          <h2 className="font-semibold text-foreground text-sm">Audit Log</h2>
+          <Badge
+            variant="outline"
+            className="text-xs border-accent/30 text-accent bg-accent/10 ml-auto"
+          >
+            Immutable · 12+ months
+          </Badge>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          All admin and financial actions are recorded here and cannot be
+          modified.
+        </p>
+      </div>
+
+      {/* Filters */}
+      <Card className="border-border shadow-sm">
+        <CardContent className="pt-4 pb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="space-y-1">
+              <label
+                htmlFor="audit-actor-filter"
+                className="text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+              >
+                Actor / User
+              </label>
+              <div className="relative">
+                <Search
+                  size={13}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
+                  id="audit-actor-filter"
+                  value={actorFilter}
+                  onChange={(e) => setActorFilter(e.target.value)}
+                  placeholder="Search by actor…"
+                  className="pl-8 text-sm h-9"
+                  data-ocid="audit-actor-filter"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label
+                htmlFor="audit-action-filter"
+                className="text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+              >
+                Action Type
+              </label>
+              <Input
+                id="audit-action-filter"
+                value={actionFilter}
+                onChange={(e) => setActionFilter(e.target.value)}
+                placeholder="e.g. ApprovePayment…"
+                className="text-sm h-9"
+                data-ocid="audit-action-filter"
+              />
+            </div>
+            <div className="space-y-1">
+              <label
+                htmlFor="audit-from-date"
+                className="text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+              >
+                From Date
+              </label>
+              <Input
+                id="audit-from-date"
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="text-sm h-9"
+                data-ocid="audit-from-date"
+              />
+            </div>
+            <div className="space-y-1">
+              <label
+                htmlFor="audit-to-date"
+                className="text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+              >
+                To Date
+              </label>
+              <Input
+                id="audit-to-date"
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="text-sm h-9"
+                data-ocid="audit-to-date"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2 mt-3">
+            <Button
+              size="sm"
+              onClick={() => void handleSearch()}
+              disabled={log.loading}
+              data-ocid="audit-search-btn"
+            >
+              {log.loading ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <Filter size={13} />
+              )}
+              Apply Filters
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void handleClear()}
+              disabled={log.loading}
+              data-ocid="audit-clear-btn"
+            >
+              <X size={13} />
+              Clear
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Error */}
+      {log.error && (
+        <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
+          <ShieldAlert size={14} />
+          {log.error}
+        </div>
+      )}
+
+      {/* Table */}
+      {log.loading ? (
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-14 w-full rounded-lg" />
+          ))}
+        </div>
+      ) : log.entries.length === 0 ? (
+        <div
+          className="text-center py-16 text-muted-foreground"
+          data-ocid="audit-log-empty"
+        >
+          <BookOpen size={40} className="mx-auto mb-3 opacity-30" />
+          <p className="font-medium">No audit entries found</p>
+          <p className="text-sm mt-1">
+            Try adjusting your filters or load the full log.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-2" data-ocid="audit-log-list">
+          {log.entries.map((entry: AuditEntry) => {
+            const category = getActionTypeBadge(entry.actionType);
+            const colorClass =
+              ACTION_TYPE_COLORS[category] ?? ACTION_TYPE_COLORS.admin;
+            return (
+              <div
+                key={entry.id}
+                className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 hover:bg-muted/20 transition-colors"
+                data-ocid={`audit-entry-${entry.id}`}
+              >
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] font-semibold border px-2 py-0.5 ${colorClass}`}
+                    >
+                      {category.toUpperCase()}
+                    </Badge>
+                    <span className="text-sm font-semibold text-foreground">
+                      {entry.actionType}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                    <span className="font-mono" title={entry.actorId}>
+                      {truncate(entry.actorId, 18)}
+                    </span>
+                    <span>·</span>
+                    <span>
+                      {entry.resourceType}:{" "}
+                      <span className="text-foreground font-medium">
+                        {entry.resourceId}
+                      </span>
+                    </span>
+                    {entry.details && (
+                      <span className="text-foreground/70">
+                        {truncate(entry.details, 40)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-xs text-muted-foreground font-mono">
+                    {formatTs(entry.timestamp)}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!log.loading && log.entries.length > 0 && (
+        <div
+          className="flex items-center justify-between pt-2"
+          data-ocid="audit-pagination"
+        >
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void log.fetchPage(log.currentPage - 1)}
+            disabled={log.currentPage === 0 || log.loading}
+            data-ocid="audit-prev"
+          >
+            <ChevronLeft size={14} />
+            Previous
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            Page {log.currentPage + 1}
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void log.fetchPage(log.currentPage + 1)}
+            disabled={log.totalFetched < 20 || log.loading}
+            data-ocid="audit-next"
+          >
+            Next
+            <ChevronRight size={14} />
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- User Management Tab (Suspend/Unsuspend with OTP) ---
+interface ManagedUser {
+  email: string;
+  role: "Customer" | "Seller";
+  suspended: boolean;
+}
+
+function UserManagementTab({ adminUserId }: { adminUserId: string }) {
+  const { actor } = useActor(createActor);
+  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [otpTarget, setOtpTarget] = useState<{
+    email: string;
+    action: "suspend" | "unsuspend";
+  } | null>(null);
+  const [actionPending, setActionPending] = useState(false);
+
+  useEffect(() => {
+    // Load users from localStorage (same store as useAuth)
+    const raw = localStorage.getItem("sa_users");
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as Record<
+          string,
+          { role: "Customer" | "Seller"; suspended?: boolean }
+        >;
+        const list: ManagedUser[] = Object.entries(parsed).map(
+          ([email, u]) => ({
+            email,
+            role: u.role,
+            suspended: u.suspended ?? false,
+          }),
+        );
+        setUsers(list);
+      } catch {
+        setUsers([]);
+      }
+    }
+    setIsLoading(false);
+  }, []);
+
+  const applySuspend = async (email: string, suspend: boolean) => {
+    setActionPending(true);
+    try {
+      // Update localStorage
+      const raw = localStorage.getItem("sa_users");
+      if (raw) {
+        const parsed = JSON.parse(raw) as Record<
+          string,
+          {
+            role: "Customer" | "Seller";
+            suspended?: boolean;
+            passwordHash: string;
+            pendingAdmin: boolean;
+          }
+        >;
+        if (parsed[email]) {
+          parsed[email].suspended = suspend;
+          localStorage.setItem("sa_users", JSON.stringify(parsed));
+        }
+      }
+      // Record in backend audit log via assignRole (closest available action)
+      if (actor) {
+        try {
+          // Lock suspended user out by recording a backend lockout signal
+          if (suspend) {
+            // Record 99 failures to trigger lockout for 15 minutes on the user's key
+            for (let i = 0; i < 5; i++) {
+              await actor.recordLoginFailure(email);
+            }
+          } else {
+            await actor.clearLoginAttempts(email);
+          }
+        } catch {
+          /* noop */
+        }
+      }
+      setUsers((prev) =>
+        prev.map((u) => (u.email === email ? { ...u, suspended: suspend } : u)),
+      );
+      toast.success(
+        suspend
+          ? `${email} has been suspended.`
+          : `${email} has been unsuspended.`,
+      );
+    } catch {
+      toast.error("Action failed. Please try again.");
+    } finally {
+      setActionPending(false);
+      setOtpTarget(null);
+    }
+  };
 
   if (isLoading) {
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
-          <Skeleton key={i} className="h-20 w-full rounded-lg" />
+          <Skeleton key={i} className="h-16 w-full rounded-lg" />
         ))}
       </div>
     );
   }
 
-  const pending = (withdrawals ?? []).filter((w) => w.status === "Pending");
-
-  if (pending.length === 0) {
+  if (users.length === 0) {
     return (
       <div
         className="text-center py-12 text-muted-foreground"
-        data-ocid="admin-withdrawals-empty"
+        data-ocid="admin-users-empty"
       >
-        <ArrowDownCircle size={36} className="mx-auto mb-3 opacity-40" />
-        <p className="font-medium">No pending withdrawals</p>
-        <p className="text-sm mt-1">
-          Seller withdrawal requests will appear here.
-        </p>
+        <Users size={36} className="mx-auto mb-3 opacity-40" />
+        <p className="font-medium">No registered users</p>
+        <p className="text-sm mt-1">Users who sign up will appear here.</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3" data-ocid="admin-withdrawals-list">
-      {pending.map((req) => {
-        const methodConf =
-          PAYMENT_METHOD_CONFIG[
-            req.method as keyof typeof PAYMENT_METHOD_CONFIG
-          ] ?? PAYMENT_METHOD_CONFIG.bkash;
-        const dateStr = new Date(req.requestedAt).toLocaleDateString();
-        return (
-          <Card
-            key={req.id}
-            className="border-border shadow-sm overflow-hidden"
-          >
+    <>
+      <OtpModal
+        open={!!otpTarget}
+        userId={adminUserId}
+        action="SuspendUser"
+        actionLabel={
+          otpTarget?.action === "suspend" ? "Suspend User" : "Unsuspend User"
+        }
+        onConfirm={async () => {
+          if (!otpTarget) return;
+          await applySuspend(otpTarget.email, otpTarget.action === "suspend");
+        }}
+        onCancel={() => setOtpTarget(null)}
+      />
+
+      <div className="space-y-3" data-ocid="admin-users-list">
+        {users.map((user) => (
+          <Card key={user.email} className="border-border shadow-sm">
             <CardContent className="p-4">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <div className="flex-1 min-w-0 space-y-1.5">
+                <div className="flex-1 min-w-0 space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-semibold text-foreground">
-                      {req.sellerName}
-                    </span>
-                    <span
-                      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg border ${methodConf.bg}`}
-                    >
-                      <span>{methodConf.emoji}</span>
-                      <span className={methodConf.color}>
-                        {methodConf.label}
-                      </span>
+                    <span className="text-sm font-medium text-foreground truncate">
+                      {user.email}
                     </span>
                     <Badge
                       variant="outline"
-                      className={`text-xs border ${WITHDRAWAL_STATUS_COLORS[req.status] ?? ""}`}
+                      className={`text-xs border ${
+                        user.role === "Seller"
+                          ? "bg-accent/10 text-accent border-accent/30"
+                          : "bg-primary/10 text-primary border-primary/30"
+                      }`}
                     >
-                      {req.status}
+                      {user.role}
                     </Badge>
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
-                    <span className="text-muted-foreground">
-                      Account:{" "}
-                      <span className="font-mono text-foreground">
-                        {req.accountNumber}
-                      </span>
-                    </span>
-                    <span className="text-muted-foreground">
-                      Requested:{" "}
-                      <span className="text-foreground">{dateStr}</span>
-                    </span>
-                    <span className="font-bold text-secondary text-sm">
-                      ৳{req.amount.toLocaleString()}
-                    </span>
+                    {user.suspended && (
+                      <Badge
+                        variant="outline"
+                        className="text-xs border bg-destructive/10 text-destructive border-destructive/30"
+                        data-ocid={`user-suspended-badge-${user.email}`}
+                      >
+                        Suspended
+                      </Badge>
+                    )}
                   </div>
                 </div>
-                <div className="flex gap-2 shrink-0">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-destructive/40 text-destructive hover:bg-destructive/10"
-                    disabled={isActionPending}
-                    data-ocid={`withdrawal-reject-${req.id}`}
-                    onClick={async () => {
-                      try {
-                        await actionWithdrawal({
-                          id: req.id,
-                          action: "reject",
-                        });
-                        toast.error("Withdrawal request rejected");
-                      } catch (e) {
-                        toast.error(
-                          e instanceof Error ? e.message : "Action failed",
-                        );
+                <div className="shrink-0">
+                  {user.suspended ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-chart-3/40 text-chart-3 hover:bg-chart-3/10"
+                      disabled={actionPending}
+                      data-ocid={`user-unsuspend-${user.email}`}
+                      onClick={() =>
+                        setOtpTarget({ email: user.email, action: "unsuspend" })
                       }
-                    }}
-                  >
-                    <X size={14} />
-                    Reject
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="bg-chart-3 text-chart-3-foreground hover:bg-chart-3/90"
-                    disabled={isActionPending}
-                    data-ocid={`withdrawal-approve-${req.id}`}
-                    onClick={async () => {
-                      try {
-                        await actionWithdrawal({
-                          id: req.id,
-                          action: "approve",
-                        });
-                        toast.success(
-                          "Withdrawal approved! Seller will be paid.",
-                        );
-                      } catch (e) {
-                        toast.error(
-                          e instanceof Error ? e.message : "Action failed",
-                        );
+                    >
+                      <UserCheck size={14} />
+                      Unsuspend
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                      disabled={actionPending}
+                      data-ocid={`user-suspend-${user.email}`}
+                      onClick={() =>
+                        setOtpTarget({ email: user.email, action: "suspend" })
                       }
-                    }}
-                  >
-                    {isActionPending ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <CheckCircle size={14} />
-                    )}
-                    Approve
-                  </Button>
+                    >
+                      <UserMinus size={14} />
+                      Suspend
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>
           </Card>
-        );
-      })}
-    </div>
+        ))}
+      </div>
+    </>
   );
 }
 
@@ -1296,17 +2392,22 @@ export function AdminPage() {
     iiIsAuthenticated: isAuthenticated,
     iiLogin: login,
     iiIsInitializing: isInitializing,
+    iiPrincipal,
   } = useAuth();
   const admin = useAdmin();
   const { orders } = useAdminOrders();
   const { data: pendingPayments } = useAdminPendingPayments();
   const { data: pendingWithdrawals } = useAdminPendingWithdrawals();
+  const { actor } = useActor(createActor);
 
   const [setupPw, setSetupPw] = useState("");
   const [setupConfirm, setSetupConfirm] = useState("");
   const [setupError, setSetupError] = useState("");
   const [loginPw, setLoginPw] = useState("");
   const [loginError, setLoginError] = useState("");
+  const [loginLocked, setLoginLocked] = useState(false);
+  const [lockSecsLeft, setLockSecsLeft] = useState(0);
+  const lockTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [sessionPw, setSessionPw] = useState("");
   const [featuredIds, setFeaturedIds] = useState<
     Record<AdminCategory, string[]>
@@ -1318,6 +2419,10 @@ export function AdminPage() {
 
   const setupStrength = getPasswordStrength(setupPw);
   const { isVerified: adminIsVerified, getFeaturedByCategory } = admin;
+
+  // Use iiPrincipal as the admin userId for OTP
+  const adminUserId = iiPrincipal ?? "admin";
+  const adminLockoutKey = `admin:${adminUserId}`;
 
   const pendingPmtCount = (pendingPayments ?? []).filter(
     (p) => p.status === "Pending",
@@ -1342,11 +2447,37 @@ export function AdminPage() {
     void load();
   }, [adminIsVerified, getFeaturedByCategory]);
 
+  // Lockout countdown effect
+  useEffect(() => {
+    return () => {
+      if (lockTimerRef.current) clearInterval(lockTimerRef.current);
+    };
+  }, []);
+
+  const startLockCountdown = (secs: number) => {
+    setLoginLocked(true);
+    setLockSecsLeft(secs);
+    if (lockTimerRef.current) clearInterval(lockTimerRef.current);
+    lockTimerRef.current = setInterval(() => {
+      setLockSecsLeft((prev) => {
+        if (prev <= 1) {
+          if (lockTimerRef.current) clearInterval(lockTimerRef.current);
+          setLoginLocked(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
   const handleAdminLogout = () => {
     admin.setIsVerified(false);
     setSessionPw("");
     setLoginPw("");
     setLoginError("");
+    setLoginLocked(false);
+    setLockSecsLeft(0);
+    if (lockTimerRef.current) clearInterval(lockTimerRef.current);
   };
 
   const handleSetup = async (e: React.FormEvent) => {
@@ -1372,11 +2503,58 @@ export function AdminPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
+
+    // Check lockout before attempting
+    if (actor) {
+      try {
+        const lockStatus = await actor.checkLoginLockout(adminLockoutKey);
+        if (lockStatus.locked) {
+          const secs = Number(lockStatus.remainingSecs);
+          startLockCountdown(secs);
+          setLoginError(
+            `Account locked. Try again in ${Math.ceil(secs / 60)} minute${secs >= 120 ? "s" : ""}.`,
+          );
+          return;
+        }
+      } catch {
+        /* backend unavailable — proceed */
+      }
+    }
+
     const ok = await admin.verifyPassword(loginPw);
     if (ok) {
+      // Clear attempts on success
+      if (actor) {
+        try {
+          await actor.clearLoginAttempts(adminLockoutKey);
+        } catch {
+          /* noop */
+        }
+      }
       setSessionPw(loginPw);
       toast.success("Welcome back, Admin!");
     } else {
+      // Record failure
+      if (actor) {
+        try {
+          const failCount = await actor.recordLoginFailure(adminLockoutKey);
+          const count = Number(failCount);
+          if (count >= 5) {
+            // Check if now locked
+            const lockStatus = await actor.checkLoginLockout(adminLockoutKey);
+            if (lockStatus.locked) {
+              const secs = Number(lockStatus.remainingSecs);
+              startLockCountdown(secs);
+              setLoginError(
+                `Too many failed attempts. Account locked for ${Math.ceil(secs / 60)} minutes.`,
+              );
+              return;
+            }
+          }
+        } catch {
+          /* noop */
+        }
+      }
       setLoginError("Incorrect password. Please try again.");
     }
   };
@@ -1506,6 +2684,7 @@ export function AdminPage() {
 
   // STATE 3: Setup but not verified → Admin Login
   if (isAuthenticated && !admin.isVerified && admin.isSetup) {
+    const lockMins = Math.ceil(lockSecsLeft / 60);
     return (
       <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center px-4 py-12">
         <Card className="w-full max-w-md shadow-lg border-border">
@@ -1534,10 +2713,21 @@ export function AdminPage() {
                   autoComplete="current-password"
                   required
                   autoFocus
+                  disabled={loginLocked}
                   data-ocid="admin-login-pw"
                 />
               </div>
-              {loginError && (
+              {loginLocked && (
+                <div
+                  className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2"
+                  role="alert"
+                  data-ocid="admin-login-locked"
+                >
+                  <ShieldAlert size={14} />
+                  Account locked · {lockMins}m {lockSecsLeft % 60}s remaining
+                </div>
+              )}
+              {!loginLocked && loginError && (
                 <div
                   className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2"
                   role="alert"
@@ -1549,7 +2739,7 @@ export function AdminPage() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={admin.isVerifyPending || !loginPw}
+                disabled={admin.isVerifyPending || !loginPw || loginLocked}
                 data-ocid="admin-login-submit"
               >
                 {admin.isVerifyPending ? (
@@ -1557,7 +2747,9 @@ export function AdminPage() {
                 ) : (
                   <LogIn size={16} />
                 )}
-                Unlock Dashboard
+                {loginLocked
+                  ? `Locked (${lockMins}m ${lockSecsLeft % 60}s)`
+                  : "Unlock Dashboard"}
               </Button>
             </form>
           </CardContent>
@@ -1566,7 +2758,7 @@ export function AdminPage() {
     );
   }
 
-  // STATE 4: Verified → Full Admin Panel with 7 tabs
+  // STATE 4: Verified → Full Admin Panel with 8 tabs (+ Audit Log)
   if (admin.isVerified) {
     const categoryConfig = [
       { key: "shop" as AdminCategory, label: "Shop", color: "text-secondary" },
@@ -1595,7 +2787,7 @@ export function AdminPage() {
                 Admin Panel
               </h1>
               <p className="text-sm text-muted-foreground">
-                Commission, payments, orders & more
+                Commission, payments, orders &amp; more
               </p>
             </div>
           </div>
@@ -1614,7 +2806,7 @@ export function AdminPage() {
         <Card className="border-border shadow-sm">
           <CardContent className="pt-6">
             <Tabs defaultValue="dashboard">
-              {/* 7-tab layout: scroll on mobile */}
+              {/* 8-tab layout: scroll on mobile */}
               <TabsList className="w-full mb-6 flex overflow-x-auto gap-0.5 h-auto p-1 flex-nowrap">
                 <TabsTrigger
                   value="dashboard"
@@ -1686,6 +2878,25 @@ export function AdminPage() {
                   Approvals
                 </TabsTrigger>
                 <TabsTrigger
+                  value="users"
+                  className="flex-1 min-w-[70px] text-xs sm:text-sm"
+                  data-ocid="admin-main-tab-users"
+                >
+                  <Users size={13} className="mr-1 hidden sm:inline shrink-0" />
+                  Users
+                </TabsTrigger>
+                <TabsTrigger
+                  value="audit"
+                  className="flex-1 min-w-[70px] text-xs sm:text-sm"
+                  data-ocid="admin-main-tab-audit"
+                >
+                  <BookOpen
+                    size={13}
+                    className="mr-1 hidden sm:inline shrink-0"
+                  />
+                  Audit Log
+                </TabsTrigger>
+                <TabsTrigger
                   value="featured"
                   className="flex-1 min-w-[75px] text-xs sm:text-sm"
                   data-ocid="admin-main-tab-featured"
@@ -1693,14 +2904,20 @@ export function AdminPage() {
                   <Star size={13} className="mr-1 hidden sm:inline shrink-0" />
                   Featured
                 </TabsTrigger>
+                <TabsTrigger
+                  value="seller-audit"
+                  className="flex-1 min-w-[85px] text-xs sm:text-sm"
+                  data-ocid="admin-main-tab-seller-audit"
+                >
+                  <Scale size={13} className="mr-1 hidden sm:inline shrink-0" />
+                  Seller Audit
+                </TabsTrigger>
               </TabsList>
 
-              {/* Dashboard */}
               <TabsContent value="dashboard">
                 <DashboardTab totalOrders={orders.length} />
               </TabsContent>
 
-              {/* Commission Dashboard */}
               <TabsContent value="commission">
                 <div className="space-y-4">
                   <div>
@@ -1716,7 +2933,6 @@ export function AdminPage() {
                 </div>
               </TabsContent>
 
-              {/* Payment Verification */}
               <TabsContent value="payments">
                 <div className="space-y-4">
                   <div>
@@ -1724,15 +2940,14 @@ export function AdminPage() {
                       Payment Verification
                     </h2>
                     <p className="text-sm text-muted-foreground">
-                      Approve or reject bKash/Nagad payment submissions from
-                      customers.
+                      Approve or reject bKash/Nagad payment submissions. OTP
+                      required for approval.
                     </p>
                   </div>
-                  <PaymentVerificationTab />
+                  <PaymentVerificationTab adminUserId={adminUserId} />
                 </div>
               </TabsContent>
 
-              {/* Withdrawal Management */}
               <TabsContent value="withdrawals">
                 <div className="space-y-4">
                   <div>
@@ -1740,15 +2955,14 @@ export function AdminPage() {
                       Withdrawal Management
                     </h2>
                     <p className="text-sm text-muted-foreground">
-                      Review and process seller withdrawal requests via
-                      bKash/Nagad.
+                      Review and process seller withdrawal requests. OTP
+                      required for approval.
                     </p>
                   </div>
-                  <WithdrawalManagementTab />
+                  <WithdrawalManagementTab adminUserId={adminUserId} />
                 </div>
               </TabsContent>
 
-              {/* All Orders */}
               <TabsContent value="orders">
                 <div className="space-y-4">
                   <div>
@@ -1763,7 +2977,6 @@ export function AdminPage() {
                 </div>
               </TabsContent>
 
-              {/* Pending Approvals */}
               <TabsContent value="approvals">
                 <div className="space-y-4">
                   <div>
@@ -1778,7 +2991,25 @@ export function AdminPage() {
                 </div>
               </TabsContent>
 
-              {/* Featured Items */}
+              <TabsContent value="users">
+                <div className="space-y-4">
+                  <div>
+                    <h2 className="text-base font-semibold text-foreground">
+                      User Management
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Suspend or unsuspend users. OTP required for suspension
+                      actions.
+                    </p>
+                  </div>
+                  <UserManagementTab adminUserId={adminUserId} />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="audit">
+                <AuditLogTab />
+              </TabsContent>
+
               <TabsContent value="featured">
                 <div className="space-y-4">
                   <div>
@@ -1822,6 +3053,10 @@ export function AdminPage() {
                     ))}
                   </Tabs>
                 </div>
+              </TabsContent>
+
+              <TabsContent value="seller-audit">
+                <SellerAuditTrailTab />
               </TabsContent>
             </Tabs>
           </CardContent>

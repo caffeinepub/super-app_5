@@ -7,12 +7,27 @@ export interface None {
     __kind__: "None";
 }
 export type Option<T> = Some<T> | None;
+export interface SellerDashboardSummary {
+    totalNetEarnings: number;
+    remainingBalance: number;
+    totalWithdrawn: number;
+    periodLabel: string;
+    totalGrossRevenue: number;
+    totalCommissionDeducted: number;
+}
 export type Timestamp = bigint;
 export interface SellerWallet {
     pendingWithdrawal: number;
     totalWithdrawn: number;
     totalEarnings: number;
     sellerId: UserId;
+}
+export interface LeaderboardEntry {
+    totalRewardEarned: number;
+    totalReferrals: bigint;
+    rank: bigint;
+    lastReferralDate: bigint;
+    referrerId: string;
 }
 export interface PaymentRecord {
     id: bigint;
@@ -31,6 +46,17 @@ export interface OrderItem {
     qty: bigint;
     name: string;
     price: number;
+}
+export interface AuditEntry {
+    id: string;
+    oldValue?: string;
+    resourceId: string;
+    newValue?: string;
+    actionType: string;
+    actorId: string;
+    resourceType: string;
+    timestamp: Timestamp;
+    details: string;
 }
 export interface WithdrawRequest {
     id: bigint;
@@ -51,6 +77,16 @@ export interface Order {
     items: Array<OrderItem>;
 }
 export type UserId = Principal;
+export interface ReferralRecord {
+    id: string;
+    status: ReferralStatus;
+    completedAt: Timestamp;
+    referrerReward: bigint;
+    code: string;
+    refereeId: string;
+    refereeBonus: bigint;
+    referrerId: string;
+}
 export interface CommissionRecord {
     id: bigint;
     rate: number;
@@ -66,8 +102,22 @@ export interface CommissionSummary {
     topSellers: Array<[UserId, number]>;
     byPeriod: Array<[string, number]>;
 }
+export interface SellerProductStat {
+    productId: string;
+    productName: string;
+    netRevenue: number;
+    salesCount: bigint;
+    totalRevenue: number;
+    commissionDeducted: number;
+}
 export interface UserProfile {
     displayName: string;
+}
+export interface SellerEarningsByPeriod {
+    period: string;
+    grossRevenue: number;
+    netRevenue: number;
+    commissionDeducted: number;
 }
 export enum OrderStatus {
     Delivered = "Delivered",
@@ -77,6 +127,11 @@ export enum OrderStatus {
 export enum PaymentMethod {
     Nagad = "Nagad",
     bKash = "bKash"
+}
+export enum ReferralStatus {
+    Invalid = "Invalid",
+    Completed = "Completed",
+    Pending = "Pending"
 }
 export enum UserRole {
     Customer = "Customer",
@@ -98,23 +153,46 @@ export interface backendInterface {
         __kind__: "err";
         err: string;
     }>;
+    checkLoginLockout(userId: string): Promise<{
+        locked: boolean;
+        remainingSecs: bigint;
+    }>;
+    clearLoginAttempts(userId: string): Promise<void>;
     createOrder(items: Array<OrderItem>): Promise<Order>;
+    createReferralCode(userId: string): Promise<string>;
+    generateOtp(userId: string, action: string): Promise<string>;
     getAdminStats(): Promise<{
         newOrders: bigint;
         pendingPayments: bigint;
         pendingWithdrawals: bigint;
     }>;
     getAllOrders(): Promise<Array<Order>>;
+    getAllSellerLimits(): Promise<Array<[string, number]>>;
+    getAllSellerSuspensions(limit: bigint, offset: bigint): Promise<Array<AuditEntry>>;
+    getAuditLog(limit: bigint, offset: bigint): Promise<Array<AuditEntry>>;
+    getAuditLogByAction(actionType: string, limit: bigint, offset: bigint): Promise<Array<AuditEntry>>;
+    getAuditLogByActor(actorId: string, limit: bigint, offset: bigint): Promise<Array<AuditEntry>>;
+    getAuditLogByDateRange(from: bigint, to: bigint, limit: bigint, offset: bigint): Promise<Array<AuditEntry>>;
     getCommissionByMonth(months: bigint): Promise<Array<[string, number]>>;
     getCommissionByPeriod(filter: string): Promise<Array<[string, number]>>;
     getCommissionSummary(): Promise<CommissionSummary>;
     getFeaturedIds(category: string): Promise<Array<string>>;
     getFeaturedIdsByCategory(category: string): Promise<Array<string>>;
+    getMyEarningsByPeriod(days: bigint, granularity: string): Promise<Array<SellerEarningsByPeriod>>;
+    getMyEarningsSummary(days: bigint): Promise<SellerDashboardSummary>;
     getMyOrders(): Promise<Array<Order>>;
     getMyPrincipal(): Promise<string>;
+    getMyProductStats(days: bigint): Promise<Array<SellerProductStat>>;
+    getMyReferralEarnings(): Promise<bigint>;
+    getMyReferrals(): Promise<Array<ReferralRecord>>;
     getMyRole(): Promise<UserRole>;
+    getMySellerOrders(): Promise<Array<Order>>;
     getPayment(id: bigint): Promise<PaymentRecord | null>;
+    getReferralCode(userId: string): Promise<string | null>;
+    getReferralLeaderboard(): Promise<Array<LeaderboardEntry>>;
     getSellerWallet(sellerId: UserId): Promise<SellerWallet | null>;
+    getSellerWithdrawalLimit(sellerId: string): Promise<number | null>;
+    getSuspensionAuditTrail(sellerId: string): Promise<Array<AuditEntry>>;
     getTopProducts(limit: bigint): Promise<Array<[string, number]>>;
     getTopSellers(limit: bigint): Promise<Array<[UserId, number]>>;
     getUserProfile(userId: UserId): Promise<UserProfile | null>;
@@ -128,6 +206,8 @@ export interface backendInterface {
     myPayments(): Promise<Array<PaymentRecord>>;
     myWallet(): Promise<SellerWallet>;
     myWithdrawals(): Promise<Array<WithdrawRequest>>;
+    processReferral(refereeId: string, referralCode: string): Promise<boolean>;
+    recordLoginFailure(userId: string): Promise<bigint>;
     rejectPayment(id: bigint): Promise<boolean>;
     rejectWithdrawal(id: bigint): Promise<boolean>;
     requestAdminRole(): Promise<{
@@ -145,6 +225,7 @@ export interface backendInterface {
         __kind__: "err";
         err: string;
     }>;
+    setSellerWithdrawalLimit(sellerId: string, limit: number): Promise<void>;
     setUserProfile(displayName: string): Promise<void>;
     setupAdminPassword(passwordHash: string): Promise<{
         __kind__: "ok";
@@ -169,4 +250,5 @@ export interface backendInterface {
         err: string;
     }>;
     verifyAdminPassword(passwordHash: string): Promise<boolean>;
+    verifyOtp(userId: string, action: string, code: string): Promise<boolean>;
 }

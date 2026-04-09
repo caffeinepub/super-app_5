@@ -13,6 +13,8 @@ import { DeliveryPage } from "./pages/Delivery";
 import { HomePage } from "./pages/Home";
 import { LoginPage } from "./pages/Login";
 import { ProductDetailsPage } from "./pages/ProductDetails";
+import { ReferralPage } from "./pages/Referral";
+import { SellerDashboardPage } from "./pages/SellerDashboard";
 import { ServicePage } from "./pages/Service";
 import { ShopPage } from "./pages/Shop";
 import { SignupPage } from "./pages/Signup";
@@ -92,6 +94,18 @@ const walletRoute = createRoute({
   component: WalletPage,
 });
 
+const sellerDashboardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/seller-dashboard",
+  component: SellerDashboardPage,
+});
+
+const referralRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/referral",
+  component: ReferralPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   shopRoute,
@@ -104,6 +118,8 @@ const routeTree = rootRoute.addChildren([
   cartRoute,
   checkoutRoute,
   walletRoute,
+  sellerDashboardRoute,
+  referralRoute,
 ]);
 
 const router = createRouter({ routeTree });

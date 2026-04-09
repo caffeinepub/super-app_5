@@ -1,4 +1,16 @@
 // Version: 1.0.0
+type AuditEntry__60967837 =
+  {
+    actionType : Text;
+    actorId : Text;
+    details : Text;
+    id : Text;
+    newValue : ?Text;
+    oldValue : ?Text;
+    resourceId : Text;
+    resourceType : Text;
+    timestamp : Timestamp__868508278
+  };
 type Category__202766044 = Category__936342486;
 type Category__936342486 = Text;
 type CommissionRecord__774282755 =
@@ -16,6 +28,8 @@ type Data__791452850<K, V> =
 type Internal__8484328<K, V> =
   {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
 type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
+type LockoutRecord__760422707 =
+  {failedCount : Nat; lockedUntil : Timestamp__1047497877; userId : Text};
 type Nat__490723111 = Nat__920180692;
 type Nat__920180692 = Nat;
 type Node__46230540<K, V> =
@@ -30,6 +44,17 @@ type Order__141779993 =
     status : OrderStatus__272730104;
     total : Float;
     userId : UserId__41638867
+  };
+type OtpAction__363427850 =
+  {#ApprovePayment; #SuspendUser; #WithdrawalRequest};
+type OtpRecord__847351081 =
+  {
+    action : OtpAction__363427850;
+    attemptsRemaining : Nat;
+    code : Text;
+    expiresAt : Timestamp__1047497877;
+    generatedAt : Timestamp__1047497877;
+    userId : Text
   };
 type PaymentMethod__281063395 = PaymentMethod__536423365;
 type PaymentMethod__536423365 = {#Nagad; #bKash};
@@ -48,6 +73,18 @@ type PaymentRecord__879948694 =
     userId : UserId__283363247
   };
 type PaymentStatus__296016569 = {#Approved; #Pending; #Rejected};
+type ReferralRecord__502422660 =
+  {
+    code : Text;
+    completedAt : Timestamp__644612830;
+    id : Text;
+    refereeBonus : Nat;
+    refereeId : Text;
+    referrerId : Text;
+    referrerReward : Nat;
+    status : ReferralStatus__1017026020
+  };
+type ReferralStatus__1017026020 = {#Completed; #Invalid; #Pending};
 type SellerWallet__714271276 =
   {
     pendingWithdrawal : Float;
@@ -55,10 +92,13 @@ type SellerWallet__714271276 =
     totalEarnings : Float;
     totalWithdrawn : Float
   };
+type Timestamp__1047497877 = Timestamp__301639476;
 type Timestamp__131386122 = Timestamp__301639476;
 type Timestamp__301639476 = Int;
 type Timestamp__600497786 = Timestamp__301639476;
+type Timestamp__644612830 = Timestamp__301639476;
 type Timestamp__813860109 = Timestamp__301639476;
+type Timestamp__868508278 = Timestamp__301639476;
 type UserId__158757552 = Principal;
 type UserId__164923593 = UserId__158757552;
 type UserId__283363247 = UserId__158757552;
@@ -82,6 +122,15 @@ type WithdrawRequest__106871691 =
 type WithdrawStatus__45521848 = {#Approved; #Pending; #Rejected};
 actor {
   stable adminState : {var adminOwner : ?Principal; var passwordHash : ?Text};
+  stable auditCounter : {var value : Nat};
+  stable auditLog :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?AuditEntry__60967837]];
+      var elementIndex : Nat__490723111
+    };
+  stable codeToUser :
+    {var root : Node__46230540<Text, Text>; var size : Nat__490723111};
   stable commissions :
     {
       var blockIndex : Nat__490723111;
@@ -99,12 +148,22 @@ actor {
       var root : Node__46230540<Category__202766044, [Text]>;
       var size : Nat__490723111
     };
+  stable lockouts :
+    {
+      var root : Node__46230540<Text, LockoutRecord__760422707>;
+      var size : Nat__490723111
+    };
   stable var nextOrderId : Nat;
   stable orders :
     {
       var blockIndex : Nat__490723111;
       var blocks : [var [var ?Order__141779993]];
       var elementIndex : Nat__490723111
+    };
+  stable otps :
+    {
+      var root : Node__46230540<Text, OtpRecord__847351081>;
+      var size : Nat__490723111
     };
   stable payments :
     {
@@ -117,11 +176,22 @@ actor {
       var root : Node__46230540<UserId__423380635, UserProfile__826653903>;
       var size : Nat__490723111
     };
+  stable referralCounter : {var value : Nat};
+  stable referrals :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?ReferralRecord__502422660]];
+      var elementIndex : Nat__490723111
+    };
   stable roles :
     {
       var root : Node__46230540<UserId__164923593, UserRole__655227432>;
       var size : Nat__490723111
     };
+  stable sellerLimits :
+    {var root : Node__46230540<Text, Float>; var size : Nat__490723111};
+  stable userToCode :
+    {var root : Node__46230540<Text, Text>; var size : Nat__490723111};
   stable wallets :
     {
       var root : Node__46230540<UserId__158757552, SellerWallet__714271276>;
