@@ -50,10 +50,13 @@ export function Layout({ children }: LayoutProps) {
             className="flex items-center gap-2 group"
             aria-label="Go to homepage"
           >
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shadow-sm">
-              <span className="text-primary-foreground font-display font-bold text-sm">
-                S
-              </span>
+            <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center shadow-sm overflow-hidden">
+              <img
+                src="/logo192.png"
+                alt="Super App Logo"
+                loading="eager"
+                className="w-full h-full object-contain"
+              />
             </div>
             <span className="font-display font-bold text-lg text-foreground tracking-tight">
               SuperApp
