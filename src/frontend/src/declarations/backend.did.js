@@ -8,7 +8,26 @@
 
 import { IDL } from '@icp-sdk/core/candid';
 
+export const StockStatus = IDL.Text;
+export const Timestamp = IDL.Int;
 export const UserId = IDL.Principal;
+export const Product = IDL.Record({
+  'id' : IDL.Text,
+  'subcategory' : IDL.Text,
+  'stockStatus' : StockStatus,
+  'shopDescription' : IDL.Text,
+  'name' : IDL.Text,
+  'createdAt' : Timestamp,
+  'description' : IDL.Text,
+  'sellerName' : IDL.Text,
+  'updatedAt' : Timestamp,
+  'shopName' : IDL.Text,
+  'sellerId' : UserId,
+  'rating' : IDL.Float64,
+  'price' : IDL.Float64,
+  'reviewCount' : IDL.Nat,
+  'images' : IDL.Vec(IDL.Text),
+});
 export const UserRole = IDL.Variant({
   'Customer' : IDL.Null,
   'Seller' : IDL.Null,
@@ -24,7 +43,6 @@ export const OrderStatus = IDL.Variant({
   'Ongoing' : IDL.Null,
   'Pending' : IDL.Null,
 });
-export const Timestamp = IDL.Int;
 export const Order = IDL.Record({
   'id' : IDL.Nat,
   'status' : OrderStatus,
@@ -122,6 +140,12 @@ export const SellerWallet = IDL.Record({
   'totalEarnings' : IDL.Float64,
   'sellerId' : UserId,
 });
+export const ShopOwnerProfile = IDL.Record({
+  'userId' : UserId,
+  'shopDescription' : IDL.Text,
+  'updatedAt' : Timestamp,
+  'shopName' : IDL.Text,
+});
 export const UserProfile = IDL.Record({ 'displayName' : IDL.Text });
 export const WithdrawStatus = IDL.Variant({
   'Approved' : IDL.Null,
@@ -149,6 +173,7 @@ export const CommissionRecord = IDL.Record({
 });
 
 export const idlService = IDL.Service({
+  'addProduct' : IDL.Func([Product], [], []),
   'approvePayment' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'approveWithdrawal' : IDL.Func([IDL.Nat], [IDL.Bool], []),
   'assignRole' : IDL.Func(
@@ -164,6 +189,7 @@ export const idlService = IDL.Service({
   'clearLoginAttempts' : IDL.Func([IDL.Text], [], []),
   'createOrder' : IDL.Func([IDL.Vec(OrderItem)], [Order], []),
   'createReferralCode' : IDL.Func([IDL.Text], [IDL.Text], []),
+  'deleteProduct' : IDL.Func([IDL.Text], [], []),
   'generateOtp' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
   'getAdminStats' : IDL.Func(
       [],
@@ -177,6 +203,7 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'getAllOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+  'getAllProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
   'getAllSellerLimits' : IDL.Func(
       [],
       [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64))],
@@ -246,6 +273,8 @@ export const idlService = IDL.Service({
   'getMyRole' : IDL.Func([], [UserRole], ['query']),
   'getMySellerOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
   'getPayment' : IDL.Func([IDL.Nat], [IDL.Opt(PaymentRecord)], ['query']),
+  'getProductById' : IDL.Func([IDL.Text], [IDL.Opt(Product)], ['query']),
+  'getProductsBySeller' : IDL.Func([UserId], [IDL.Vec(Product)], ['query']),
   'getReferralCode' : IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
   'getReferralLeaderboard' : IDL.Func(
       [],
@@ -256,6 +285,11 @@ export const idlService = IDL.Service({
   'getSellerWithdrawalLimit' : IDL.Func(
       [IDL.Text],
       [IDL.Opt(IDL.Float64)],
+      ['query'],
+    ),
+  'getShopOwnerProfile' : IDL.Func(
+      [UserId],
+      [IDL.Opt(ShopOwnerProfile)],
       ['query'],
     ),
   'getSuspensionAuditTrail' : IDL.Func(
@@ -329,6 +363,8 @@ export const idlService = IDL.Service({
       [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
       [],
     ),
+  'updateProduct' : IDL.Func([Product], [], []),
+  'updateShopOwnerProfile' : IDL.Func([ShopOwnerProfile], [], []),
   'verifyAdminPassword' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
   'verifyOtp' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
 });
@@ -336,7 +372,26 @@ export const idlService = IDL.Service({
 export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
+  const StockStatus = IDL.Text;
+  const Timestamp = IDL.Int;
   const UserId = IDL.Principal;
+  const Product = IDL.Record({
+    'id' : IDL.Text,
+    'subcategory' : IDL.Text,
+    'stockStatus' : StockStatus,
+    'shopDescription' : IDL.Text,
+    'name' : IDL.Text,
+    'createdAt' : Timestamp,
+    'description' : IDL.Text,
+    'sellerName' : IDL.Text,
+    'updatedAt' : Timestamp,
+    'shopName' : IDL.Text,
+    'sellerId' : UserId,
+    'rating' : IDL.Float64,
+    'price' : IDL.Float64,
+    'reviewCount' : IDL.Nat,
+    'images' : IDL.Vec(IDL.Text),
+  });
   const UserRole = IDL.Variant({
     'Customer' : IDL.Null,
     'Seller' : IDL.Null,
@@ -352,7 +407,6 @@ export const idlFactory = ({ IDL }) => {
     'Ongoing' : IDL.Null,
     'Pending' : IDL.Null,
   });
-  const Timestamp = IDL.Int;
   const Order = IDL.Record({
     'id' : IDL.Nat,
     'status' : OrderStatus,
@@ -447,6 +501,12 @@ export const idlFactory = ({ IDL }) => {
     'totalEarnings' : IDL.Float64,
     'sellerId' : UserId,
   });
+  const ShopOwnerProfile = IDL.Record({
+    'userId' : UserId,
+    'shopDescription' : IDL.Text,
+    'updatedAt' : Timestamp,
+    'shopName' : IDL.Text,
+  });
   const UserProfile = IDL.Record({ 'displayName' : IDL.Text });
   const WithdrawStatus = IDL.Variant({
     'Approved' : IDL.Null,
@@ -474,6 +534,7 @@ export const idlFactory = ({ IDL }) => {
   });
   
   return IDL.Service({
+    'addProduct' : IDL.Func([Product], [], []),
     'approvePayment' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'approveWithdrawal' : IDL.Func([IDL.Nat], [IDL.Bool], []),
     'assignRole' : IDL.Func(
@@ -489,6 +550,7 @@ export const idlFactory = ({ IDL }) => {
     'clearLoginAttempts' : IDL.Func([IDL.Text], [], []),
     'createOrder' : IDL.Func([IDL.Vec(OrderItem)], [Order], []),
     'createReferralCode' : IDL.Func([IDL.Text], [IDL.Text], []),
+    'deleteProduct' : IDL.Func([IDL.Text], [], []),
     'generateOtp' : IDL.Func([IDL.Text, IDL.Text], [IDL.Text], []),
     'getAdminStats' : IDL.Func(
         [],
@@ -502,6 +564,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getAllOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+    'getAllProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
     'getAllSellerLimits' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Float64))],
@@ -571,6 +634,8 @@ export const idlFactory = ({ IDL }) => {
     'getMyRole' : IDL.Func([], [UserRole], ['query']),
     'getMySellerOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
     'getPayment' : IDL.Func([IDL.Nat], [IDL.Opt(PaymentRecord)], ['query']),
+    'getProductById' : IDL.Func([IDL.Text], [IDL.Opt(Product)], ['query']),
+    'getProductsBySeller' : IDL.Func([UserId], [IDL.Vec(Product)], ['query']),
     'getReferralCode' : IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
     'getReferralLeaderboard' : IDL.Func(
         [],
@@ -581,6 +646,11 @@ export const idlFactory = ({ IDL }) => {
     'getSellerWithdrawalLimit' : IDL.Func(
         [IDL.Text],
         [IDL.Opt(IDL.Float64)],
+        ['query'],
+      ),
+    'getShopOwnerProfile' : IDL.Func(
+        [UserId],
+        [IDL.Opt(ShopOwnerProfile)],
         ['query'],
       ),
     'getSuspensionAuditTrail' : IDL.Func(
@@ -654,6 +724,8 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
         [],
       ),
+    'updateProduct' : IDL.Func([Product], [], []),
+    'updateShopOwnerProfile' : IDL.Func([ShopOwnerProfile], [], []),
     'verifyAdminPassword' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
     'verifyOtp' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
   });

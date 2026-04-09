@@ -13,6 +13,8 @@ import SecurityTypes "types/security";
 import AuditTypes "types/audit";
 import ReferralTypes "types/referral";
 import Common "types/common";
+import ProductTypes "types/products";
+import ShopOwnerTypes "types/shop-owner";
 import ProfilesApi "mixins/profiles-api";
 import FeaturedApi "mixins/featured-api";
 import AdminApi "mixins/admin-api";
@@ -23,6 +25,7 @@ import SellerDashboardApi "mixins/seller-dashboard-api";
 import SecurityApi "mixins/security-api";
 import AuditApi "mixins/audit-api";
 import ReferralApi "mixins/referral-api";
+import ProductsApi "mixins/products-api";
 
 actor {
   // Existing state — unchanged
@@ -64,6 +67,10 @@ actor {
   let codeToUser = Map.empty<Text, Text>();
   let referralCounter : { var value : Nat } = { var value = 0 };
 
+  // State for products and shop owner profiles
+  let productsMap = Map.empty<Text, ProductTypes.Product>();
+  let shopOwnersMap = Map.empty<ProductTypes.UserId, ShopOwnerTypes.ShopOwnerProfile>();
+
   // Existing mixins — unchanged
   include ProfilesApi(profiles);
   include FeaturedApi(featured);
@@ -98,4 +105,7 @@ actor {
 
   // Referral mixin
   include ReferralApi(referrals, userToCode, codeToUser, referralCounter, wallets);
+
+  // Products and shop owner profile mixin
+  include ProductsApi(productsMap, shopOwnersMap, roles);
 };

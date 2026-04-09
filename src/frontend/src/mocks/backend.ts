@@ -6,6 +6,92 @@ import {
   WithdrawStatus,
   type backendInterface,
 } from "../backend";
+import type { Product, ShopOwnerProfile } from "../backend.d";
+
+// In-memory stores for products and shop owner profiles
+const mockProductsMap = new Map<string, Product>([
+  [
+    "prod-mock-1",
+    {
+      id: "prod-mock-1",
+      name: "Premium Cotton T-Shirt",
+      description: "High quality 100% cotton t-shirt, comfortable for everyday wear. Available in multiple colors.",
+      images: ["https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400"],
+      sellerId: "seller-1" as unknown as import("@icp-sdk/core/principal").Principal,
+      sellerName: "Fashion Hub",
+      shopName: "Fashion Hub BD",
+      shopDescription: "Premium quality clothing at affordable prices.",
+      subcategory: "Clothing",
+      price: 750,
+      stockStatus: "in_stock",
+      rating: 4.5,
+      reviewCount: BigInt(128),
+      createdAt: BigInt(Date.now() - 2592000000),
+      updatedAt: BigInt(Date.now() - 86400000),
+    },
+  ],
+  [
+    "prod-mock-2",
+    {
+      id: "prod-mock-2",
+      name: "Leather Sneakers",
+      description: "Stylish leather sneakers with cushioned sole. Perfect for casual and semi-formal occasions.",
+      images: ["https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400"],
+      sellerId: "seller-1" as unknown as import("@icp-sdk/core/principal").Principal,
+      sellerName: "Fashion Hub",
+      shopName: "Fashion Hub BD",
+      shopDescription: "Premium quality clothing at affordable prices.",
+      subcategory: "Footwear",
+      price: 3200,
+      stockStatus: "limited",
+      rating: 4.3,
+      reviewCount: BigInt(64),
+      createdAt: BigInt(Date.now() - 1296000000),
+      updatedAt: BigInt(Date.now() - 43200000),
+    },
+  ],
+  [
+    "prod-mock-3",
+    {
+      id: "prod-mock-3",
+      name: "Wireless Bluetooth Headphones",
+      description: "Crystal clear sound with active noise cancellation. Up to 30 hours battery life.",
+      images: ["https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400"],
+      sellerId: "seller-2" as unknown as import("@icp-sdk/core/principal").Principal,
+      sellerName: "Tech World",
+      shopName: "Tech World BD",
+      shopDescription: "Latest electronics and gadgets at best prices.",
+      subcategory: "Electronics",
+      price: 4500,
+      stockStatus: "in_stock",
+      rating: 4.7,
+      reviewCount: BigInt(215),
+      createdAt: BigInt(Date.now() - 864000000),
+      updatedAt: BigInt(Date.now() - 21600000),
+    },
+  ],
+]);
+
+const mockShopOwnersMap = new Map<string, ShopOwnerProfile>([
+  [
+    "seller-1",
+    {
+      userId: "seller-1" as unknown as import("@icp-sdk/core/principal").Principal,
+      shopName: "Fashion Hub BD",
+      shopDescription: "Premium quality clothing at affordable prices.",
+      updatedAt: BigInt(Date.now() - 86400000),
+    },
+  ],
+  [
+    "seller-2",
+    {
+      userId: "seller-2" as unknown as import("@icp-sdk/core/principal").Principal,
+      shopName: "Tech World BD",
+      shopDescription: "Latest electronics and gadgets at best prices.",
+      updatedAt: BigInt(Date.now() - 172800000),
+    },
+  ],
+]);
 
 export const mockBackend: backendInterface = {
   approvePayment: async () => true,
@@ -227,4 +313,34 @@ export const mockBackend: backendInterface = {
   updateOrderStatus: async () => ({ __kind__: "ok", ok: null }),
   verifyAdminPassword: async () => true,
   verifyOtp: async () => true,
+  // Product management
+  getAllProducts: async () => Array.from(mockProductsMap.values()),
+  getProductById: async (id: string) => mockProductsMap.get(id) ?? null,
+  getProductsBySeller: async (sellerId) => {
+    const sellerIdStr = typeof sellerId === "string" ? sellerId : (sellerId as { toText(): string }).toText();
+    return Array.from(mockProductsMap.values()).filter((p) => {
+      const pSellerId = typeof p.sellerId === "string" ? p.sellerId : (p.sellerId as { toText(): string }).toText();
+      return pSellerId === sellerIdStr;
+    });
+  },
+  addProduct: async (product: Product) => {
+    const id = product.id || `prod-${Date.now()}`;
+    mockProductsMap.set(id, { ...product, id, createdAt: BigInt(Date.now()), updatedAt: BigInt(Date.now()) });
+  },
+  updateProduct: async (product: Product) => {
+    if (mockProductsMap.has(product.id)) {
+      mockProductsMap.set(product.id, { ...product, updatedAt: BigInt(Date.now()) });
+    }
+  },
+  deleteProduct: async (id: string) => {
+    mockProductsMap.delete(id);
+  },
+  getShopOwnerProfile: async (userId) => {
+    const userIdStr = typeof userId === "string" ? userId : (userId as { toText(): string }).toText();
+    return mockShopOwnersMap.get(userIdStr) ?? null;
+  },
+  updateShopOwnerProfile: async (profile: ShopOwnerProfile) => {
+    const userIdStr = typeof profile.userId === "string" ? profile.userId : (profile.userId as { toText(): string }).toText();
+    mockShopOwnersMap.set(userIdStr, { ...profile, updatedAt: BigInt(Date.now()) });
+  },
 };

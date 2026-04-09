@@ -22,12 +22,28 @@ export interface SellerWallet {
     totalEarnings: number;
     sellerId: UserId;
 }
-export interface LeaderboardEntry {
-    totalRewardEarned: number;
-    totalReferrals: bigint;
-    rank: bigint;
-    lastReferralDate: bigint;
-    referrerId: string;
+export interface ShopOwnerProfile {
+    userId: UserId;
+    shopDescription: string;
+    updatedAt: Timestamp;
+    shopName: string;
+}
+export interface Product {
+    id: string;
+    subcategory: string;
+    stockStatus: StockStatus;
+    shopDescription: string;
+    name: string;
+    createdAt: Timestamp;
+    description: string;
+    sellerName: string;
+    updatedAt: Timestamp;
+    shopName: string;
+    sellerId: UserId;
+    rating: number;
+    price: number;
+    reviewCount: bigint;
+    images: Array<string>;
 }
 export interface PaymentRecord {
     id: bigint;
@@ -42,21 +58,18 @@ export interface PaymentRecord {
     amount: number;
     transactionId: string;
 }
+export type StockStatus = string;
 export interface OrderItem {
     qty: bigint;
     name: string;
     price: number;
 }
-export interface AuditEntry {
-    id: string;
-    oldValue?: string;
-    resourceId: string;
-    newValue?: string;
-    actionType: string;
-    actorId: string;
-    resourceType: string;
-    timestamp: Timestamp;
-    details: string;
+export interface LeaderboardEntry {
+    totalRewardEarned: number;
+    totalReferrals: bigint;
+    rank: bigint;
+    lastReferralDate: bigint;
+    referrerId: string;
 }
 export interface WithdrawRequest {
     id: bigint;
@@ -75,6 +88,17 @@ export interface Order {
     userId: UserId;
     date: Timestamp;
     items: Array<OrderItem>;
+}
+export interface AuditEntry {
+    id: string;
+    oldValue?: string;
+    resourceId: string;
+    newValue?: string;
+    actionType: string;
+    actorId: string;
+    resourceType: string;
+    timestamp: Timestamp;
+    details: string;
 }
 export type UserId = Principal;
 export interface ReferralRecord {
@@ -144,6 +168,7 @@ export enum WithdrawStatus {
     Pending = "Pending"
 }
 export interface backendInterface {
+    addProduct(product: Product): Promise<void>;
     approvePayment(id: bigint): Promise<boolean>;
     approveWithdrawal(id: bigint): Promise<boolean>;
     assignRole(userId: UserId, role: UserRole): Promise<{
@@ -160,6 +185,7 @@ export interface backendInterface {
     clearLoginAttempts(userId: string): Promise<void>;
     createOrder(items: Array<OrderItem>): Promise<Order>;
     createReferralCode(userId: string): Promise<string>;
+    deleteProduct(id: string): Promise<void>;
     generateOtp(userId: string, action: string): Promise<string>;
     getAdminStats(): Promise<{
         newOrders: bigint;
@@ -167,6 +193,7 @@ export interface backendInterface {
         pendingWithdrawals: bigint;
     }>;
     getAllOrders(): Promise<Array<Order>>;
+    getAllProducts(): Promise<Array<Product>>;
     getAllSellerLimits(): Promise<Array<[string, number]>>;
     getAllSellerSuspensions(limit: bigint, offset: bigint): Promise<Array<AuditEntry>>;
     getAuditLog(limit: bigint, offset: bigint): Promise<Array<AuditEntry>>;
@@ -188,10 +215,13 @@ export interface backendInterface {
     getMyRole(): Promise<UserRole>;
     getMySellerOrders(): Promise<Array<Order>>;
     getPayment(id: bigint): Promise<PaymentRecord | null>;
+    getProductById(id: string): Promise<Product | null>;
+    getProductsBySeller(sellerId: UserId): Promise<Array<Product>>;
     getReferralCode(userId: string): Promise<string | null>;
     getReferralLeaderboard(): Promise<Array<LeaderboardEntry>>;
     getSellerWallet(sellerId: UserId): Promise<SellerWallet | null>;
     getSellerWithdrawalLimit(sellerId: string): Promise<number | null>;
+    getShopOwnerProfile(userId: UserId): Promise<ShopOwnerProfile | null>;
     getSuspensionAuditTrail(sellerId: string): Promise<Array<AuditEntry>>;
     getTopProducts(limit: bigint): Promise<Array<[string, number]>>;
     getTopSellers(limit: bigint): Promise<Array<[UserId, number]>>;
@@ -249,6 +279,8 @@ export interface backendInterface {
         __kind__: "err";
         err: string;
     }>;
+    updateProduct(product: Product): Promise<void>;
+    updateShopOwnerProfile(profile: ShopOwnerProfile): Promise<void>;
     verifyAdminPassword(passwordHash: string): Promise<boolean>;
     verifyOtp(userId: string, action: string, code: string): Promise<boolean>;
 }

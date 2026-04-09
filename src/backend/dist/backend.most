@@ -73,6 +73,24 @@ type PaymentRecord__879948694 =
     userId : UserId__283363247
   };
 type PaymentStatus__296016569 = {#Approved; #Pending; #Rejected};
+type Product__750902660 =
+  {
+    createdAt : Timestamp__77860887;
+    description : Text;
+    id : Text;
+    images : [Text];
+    name : Text;
+    price : Float;
+    rating : Float;
+    reviewCount : Nat;
+    sellerId : UserId__200281261;
+    sellerName : Text;
+    shopDescription : Text;
+    shopName : Text;
+    stockStatus : StockStatus__755125146;
+    subcategory : Text;
+    updatedAt : Timestamp__77860887
+  };
 type ReferralRecord__502422660 =
   {
     code : Text;
@@ -92,16 +110,28 @@ type SellerWallet__714271276 =
     totalEarnings : Float;
     totalWithdrawn : Float
   };
+type ShopOwnerProfile__53539145 =
+  {
+    shopDescription : Text;
+    shopName : Text;
+    updatedAt : Timestamp__650975075;
+    userId : UserId__288791968
+  };
+type StockStatus__755125146 = Text;
 type Timestamp__1047497877 = Timestamp__301639476;
 type Timestamp__131386122 = Timestamp__301639476;
 type Timestamp__301639476 = Int;
 type Timestamp__600497786 = Timestamp__301639476;
 type Timestamp__644612830 = Timestamp__301639476;
+type Timestamp__650975075 = Timestamp__301639476;
+type Timestamp__77860887 = Timestamp__301639476;
 type Timestamp__813860109 = Timestamp__301639476;
 type Timestamp__868508278 = Timestamp__301639476;
 type UserId__158757552 = Principal;
 type UserId__164923593 = UserId__158757552;
+type UserId__200281261 = UserId__158757552;
 type UserId__283363247 = UserId__158757552;
+type UserId__288791968 = UserId__158757552;
 type UserId__41638867 = UserId__158757552;
 type UserId__423380635 = UserId__158757552;
 type UserId__74810557 = UserId__158757552;
@@ -171,6 +201,11 @@ actor {
       var blocks : [var [var ?PaymentRecord__879948694]];
       var elementIndex : Nat__490723111
     };
+  stable productsMap :
+    {
+      var root : Node__46230540<Text, Product__750902660>;
+      var size : Nat__490723111
+    };
   stable profiles :
     {
       var root : Node__46230540<UserId__423380635, UserProfile__826653903>;
@@ -190,6 +225,11 @@ actor {
     };
   stable sellerLimits :
     {var root : Node__46230540<Text, Float>; var size : Nat__490723111};
+  stable shopOwnersMap :
+    {
+      var root : Node__46230540<UserId__200281261, ShopOwnerProfile__53539145>;
+      var size : Nat__490723111
+    };
   stable userToCode :
     {var root : Node__46230540<Text, Text>; var size : Nat__490723111};
   stable wallets :

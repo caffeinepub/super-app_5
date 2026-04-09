@@ -1,10 +1,19 @@
 import { Link } from "@tanstack/react-router";
-import { Filter, Search, ShoppingBag, ShoppingCart, Star } from "lucide-react";
+import {
+  Filter,
+  Loader2,
+  Search,
+  ShoppingBag,
+  ShoppingCart,
+  Star,
+  Store,
+} from "lucide-react";
 import { useState } from "react";
 import { shopItems } from "../data/shopItems";
 import { useCart } from "../hooks/useCart";
 import { useFeaturedIds } from "../hooks/useFeaturedIds";
-import type { ShopItem } from "../types";
+import { useAllProducts } from "../hooks/useProducts";
+import type { BackendProduct, ShopItem } from "../types";
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -32,6 +41,16 @@ function StockBadge({ inStock }: { inStock: boolean }) {
     </span>
   ) : (
     <span className="stock-out">Out of Stock</span>
+  );
+}
+
+function SellerBadge({ name }: { name: string }) {
+  if (!name) return null;
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-primary/80 bg-primary/8 border border-primary/15 rounded-full px-2 py-0.5 mt-1 truncate max-w-full">
+      <Store size={9} className="shrink-0" />
+      <span className="truncate">{name}</span>
+    </span>
   );
 }
 
@@ -85,6 +104,14 @@ function ProductCard({
           </p>
         </Link>
 
+        {"sellerBadge" in item &&
+          typeof (item as ShopItem & { sellerBadge?: string }).sellerBadge ===
+            "string" && (
+            <SellerBadge
+              name={(item as ShopItem & { sellerBadge: string }).sellerBadge}
+            />
+          )}
+
         <div className="flex items-center gap-1.5 mt-1.5">
           <StarRating rating={item.rating} />
           <span className="text-[11px] text-muted-foreground font-body">
@@ -94,7 +121,7 @@ function ProductCard({
 
         <div className="flex items-center justify-between mt-auto pt-2">
           <span className="product-price text-base mt-0">
-            ${item.price.toFixed(2)}
+            ৳{item.price.toFixed(2)}
           </span>
           <StockBadge inStock={item.inStock} />
         </div>
@@ -125,14 +152,46 @@ function ProductCard({
   );
 }
 
+/** Convert a BackendProduct to a ShopItem for unified display */
+function backendToShopItem(
+  p: BackendProduct,
+): ShopItem & { sellerBadge: string } {
+  return {
+    id: `backend-${p.id}`,
+    name: p.name,
+    description: p.description,
+    category: "shop",
+    subcategory: p.subcategory || "Other",
+    price: p.price,
+    rating: p.rating,
+    reviews: Number(p.reviewCount),
+    emoji: "📦",
+    image: p.images[0] ?? "",
+    isFeatured: false,
+    inStock: p.stockStatus !== "out_of_stock",
+    sellerBadge: p.shopName || p.sellerName || "",
+  };
+}
+
 export function ShopPage() {
   const [search, setSearch] = useState("");
   const { featuredIds } = useFeaturedIds("shop");
   const { addToCart, cartCount } = useCart();
+  const {
+    data: backendProducts,
+    isLoading: bpLoading,
+    isError: bpError,
+  } = useAllProducts();
 
   const featuredSet = new Set(featuredIds);
 
-  const filtered = shopItems.filter(
+  // Convert backend products to ShopItem format
+  const backendShopItems = (backendProducts ?? []).map(backendToShopItem);
+
+  // Static items merged below backend items
+  const allItems = [...backendShopItems, ...shopItems];
+
+  const filtered = allItems.filter(
     (p) =>
       p.name.toLowerCase().includes(search.toLowerCase()) ||
       p.subcategory.toLowerCase().includes(search.toLowerCase()) ||
@@ -214,6 +273,25 @@ export function ShopPage() {
       {/* Content */}
       <section className="bg-background">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-8">
+          {/* Backend loading / error banner */}
+          {bpLoading && (
+            <div
+              className="flex items-center gap-3 rounded-xl px-4 py-3 bg-primary/8 border border-primary/20 text-sm text-primary"
+              data-ocid="shop-backend-loading"
+            >
+              <Loader2 size={16} className="animate-spin shrink-0" />
+              Loading products from store…
+            </div>
+          )}
+          {bpError && (
+            <div
+              className="rounded-xl px-4 py-3 bg-destructive/8 border border-destructive/20 text-sm text-destructive"
+              data-ocid="shop-backend-error"
+            >
+              ⚠️ Could not load store products. Showing sample products below.
+            </div>
+          )}
+
           {/* Featured Section */}
           {showFeatured && (
             <div>
@@ -255,21 +333,81 @@ export function ShopPage() {
               </p>
             </div>
           ) : (
-            <div>
-              <h2 className="font-display font-bold text-lg text-foreground mb-4">
-                {search ? "Search Results" : "All Products"}
-              </h2>
-              <div className="product-grid" data-ocid="shop-product-grid">
-                {filtered.map((item) => (
-                  <ProductCard
-                    key={item.id}
-                    item={item}
-                    isFeatured={featuredSet.has(item.id)}
-                    onAddToCart={handleAddToCart}
-                  />
-                ))}
-              </div>
-            </div>
+            <>
+              {/* Backend products section */}
+              {!bpLoading && backendShopItems.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-5 h-5 rounded-md bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                      <Store size={11} className="text-white" />
+                    </div>
+                    <h2 className="font-display font-bold text-lg text-foreground">
+                      {search ? "Store Results" : "Store Products"}
+                    </h2>
+                    <span className="ml-2 text-xs font-medium text-primary bg-primary/10 border border-primary/20 rounded-full px-2 py-0.5">
+                      {
+                        backendShopItems.filter(
+                          (i) =>
+                            !search ||
+                            i.name
+                              .toLowerCase()
+                              .includes(search.toLowerCase()) ||
+                            i.subcategory
+                              .toLowerCase()
+                              .includes(search.toLowerCase()),
+                        ).length
+                      }{" "}
+                      items
+                    </span>
+                  </div>
+                  <div className="product-grid" data-ocid="shop-backend-grid">
+                    {filtered
+                      .filter((i) => i.id.startsWith("backend-"))
+                      .map((item) => (
+                        <ProductCard
+                          key={item.id}
+                          item={item}
+                          isFeatured={featuredSet.has(item.id)}
+                          onAddToCart={handleAddToCart}
+                        />
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Sample products section */}
+              {filtered.filter((i) => !i.id.startsWith("backend-")).length >
+                0 && (
+                <div>
+                  {backendShopItems.length > 0 && (
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="flex-1 h-px bg-border" />
+                      <span className="text-xs font-medium text-muted-foreground bg-muted/50 px-3 py-1 rounded-full border border-border">
+                        Sample Products
+                      </span>
+                      <div className="flex-1 h-px bg-border" />
+                    </div>
+                  )}
+                  {!backendShopItems.length && (
+                    <h2 className="font-display font-bold text-lg text-foreground mb-4">
+                      {search ? "Search Results" : "All Products"}
+                    </h2>
+                  )}
+                  <div className="product-grid" data-ocid="shop-product-grid">
+                    {filtered
+                      .filter((i) => !i.id.startsWith("backend-"))
+                      .map((item) => (
+                        <ProductCard
+                          key={item.id}
+                          item={item}
+                          isFeatured={featuredSet.has(item.id)}
+                          onAddToCart={handleAddToCart}
+                        />
+                      ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </section>

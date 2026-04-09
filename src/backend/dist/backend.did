@@ -24,6 +24,14 @@ type UserRole =
 type UserProfile = record {displayName: text;};
 type UserId = principal;
 type Timestamp = int;
+type StockStatus = text;
+type ShopOwnerProfile = 
+ record {
+   shopDescription: text;
+   shopName: text;
+   updatedAt: Timestamp;
+   userId: UserId;
+ };
 type SellerWallet = 
  record {
    pendingWithdrawal: float64;
@@ -72,6 +80,24 @@ type ReferralRecord =
    referrerId: text;
    referrerReward: nat;
    status: ReferralStatus;
+ };
+type Product = 
+ record {
+   createdAt: Timestamp;
+   description: text;
+   id: text;
+   images: vec text;
+   name: text;
+   price: float64;
+   rating: float64;
+   reviewCount: nat;
+   sellerId: UserId;
+   sellerName: text;
+   shopDescription: text;
+   shopName: text;
+   stockStatus: StockStatus;
+   subcategory: text;
+   updatedAt: Timestamp;
  };
 type PaymentStatus = 
  variant {
@@ -166,6 +192,7 @@ type AuditEntry =
    timestamp: Timestamp;
  };
 service : {
+  addProduct: (product: Product) -> ();
   approvePayment: (id: nat) -> (bool);
   approveWithdrawal: (id: nat) -> (bool);
   assignRole: (userId: UserId, role: UserRole) -> (variant {
@@ -180,6 +207,7 @@ service : {
   clearLoginAttempts: (userId: text) -> ();
   createOrder: (items: vec OrderItem) -> (Order);
   createReferralCode: (userId: text) -> (text);
+  deleteProduct: (id: text) -> ();
   generateOtp: (userId: text, action: text) -> (text);
   getAdminStats: () ->
    (record {
@@ -188,6 +216,7 @@ service : {
       pendingWithdrawals: nat;
     }) query;
   getAllOrders: () -> (vec Order) query;
+  getAllProducts: () -> (vec Product) query;
   getAllSellerLimits: () -> (vec record {
                                    text;
                                    float64;
@@ -223,10 +252,13 @@ service : {
   getMyRole: () -> (UserRole) query;
   getMySellerOrders: () -> (vec Order) query;
   getPayment: (id: nat) -> (opt PaymentRecord) query;
+  getProductById: (id: text) -> (opt Product) query;
+  getProductsBySeller: (sellerId: UserId) -> (vec Product) query;
   getReferralCode: (userId: text) -> (opt text) query;
   getReferralLeaderboard: () -> (vec LeaderboardEntry) query;
   getSellerWallet: (sellerId: UserId) -> (opt SellerWallet) query;
   getSellerWithdrawalLimit: (sellerId: text) -> (opt float64) query;
+  getShopOwnerProfile: (userId: UserId) -> (opt ShopOwnerProfile) query;
   getSuspensionAuditTrail: (sellerId: text) -> (vec AuditEntry) query;
   getTopProducts: (limit: nat) -> (vec record {
                                          text;
@@ -280,6 +312,8 @@ service : {
       err: text;
       ok;
     });
+  updateProduct: (product: Product) -> ();
+  updateShopOwnerProfile: (profile: ShopOwnerProfile) -> ();
   verifyAdminPassword: (passwordHash: text) -> (bool) query;
   verifyOtp: (userId: text, action: text, code: text) -> (bool);
 }

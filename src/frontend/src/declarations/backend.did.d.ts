@@ -73,6 +73,23 @@ export interface PaymentRecord {
 export type PaymentStatus = { 'Approved' : null } |
   { 'Rejected' : null } |
   { 'Pending' : null };
+export interface Product {
+  'id' : string,
+  'subcategory' : string,
+  'stockStatus' : StockStatus,
+  'shopDescription' : string,
+  'name' : string,
+  'createdAt' : Timestamp,
+  'description' : string,
+  'sellerName' : string,
+  'updatedAt' : Timestamp,
+  'shopName' : string,
+  'sellerId' : UserId,
+  'rating' : number,
+  'price' : number,
+  'reviewCount' : bigint,
+  'images' : Array<string>,
+}
 export interface ReferralRecord {
   'id' : string,
   'status' : ReferralStatus,
@@ -114,6 +131,13 @@ export interface SellerWallet {
   'totalEarnings' : number,
   'sellerId' : UserId,
 }
+export interface ShopOwnerProfile {
+  'userId' : UserId,
+  'shopDescription' : string,
+  'updatedAt' : Timestamp,
+  'shopName' : string,
+}
+export type StockStatus = string;
 export type Timestamp = bigint;
 export type UserId = Principal;
 export interface UserProfile { 'displayName' : string }
@@ -134,6 +158,7 @@ export type WithdrawStatus = { 'Approved' : null } |
   { 'Rejected' : null } |
   { 'Pending' : null };
 export interface _SERVICE {
+  'addProduct' : ActorMethod<[Product], undefined>,
   'approvePayment' : ActorMethod<[bigint], boolean>,
   'approveWithdrawal' : ActorMethod<[bigint], boolean>,
   'assignRole' : ActorMethod<
@@ -148,6 +173,7 @@ export interface _SERVICE {
   'clearLoginAttempts' : ActorMethod<[string], undefined>,
   'createOrder' : ActorMethod<[Array<OrderItem>], Order>,
   'createReferralCode' : ActorMethod<[string], string>,
+  'deleteProduct' : ActorMethod<[string], undefined>,
   'generateOtp' : ActorMethod<[string, string], string>,
   'getAdminStats' : ActorMethod<
     [],
@@ -158,6 +184,7 @@ export interface _SERVICE {
     }
   >,
   'getAllOrders' : ActorMethod<[], Array<Order>>,
+  'getAllProducts' : ActorMethod<[], Array<Product>>,
   'getAllSellerLimits' : ActorMethod<[], Array<[string, number]>>,
   'getAllSellerSuspensions' : ActorMethod<[bigint, bigint], Array<AuditEntry>>,
   'getAuditLog' : ActorMethod<[bigint, bigint], Array<AuditEntry>>,
@@ -191,10 +218,13 @@ export interface _SERVICE {
   'getMyRole' : ActorMethod<[], UserRole>,
   'getMySellerOrders' : ActorMethod<[], Array<Order>>,
   'getPayment' : ActorMethod<[bigint], [] | [PaymentRecord]>,
+  'getProductById' : ActorMethod<[string], [] | [Product]>,
+  'getProductsBySeller' : ActorMethod<[UserId], Array<Product>>,
   'getReferralCode' : ActorMethod<[string], [] | [string]>,
   'getReferralLeaderboard' : ActorMethod<[], Array<LeaderboardEntry>>,
   'getSellerWallet' : ActorMethod<[UserId], [] | [SellerWallet]>,
   'getSellerWithdrawalLimit' : ActorMethod<[string], [] | [number]>,
+  'getShopOwnerProfile' : ActorMethod<[UserId], [] | [ShopOwnerProfile]>,
   'getSuspensionAuditTrail' : ActorMethod<[string], Array<AuditEntry>>,
   'getTopProducts' : ActorMethod<[bigint], Array<[string, number]>>,
   'getTopSellers' : ActorMethod<[bigint], Array<[UserId, number]>>,
@@ -241,6 +271,8 @@ export interface _SERVICE {
     { 'ok' : null } |
       { 'err' : string }
   >,
+  'updateProduct' : ActorMethod<[Product], undefined>,
+  'updateShopOwnerProfile' : ActorMethod<[ShopOwnerProfile], undefined>,
   'verifyAdminPassword' : ActorMethod<[string], boolean>,
   'verifyOtp' : ActorMethod<[string, string, string], boolean>,
 }

@@ -18,6 +18,7 @@ import {
   ChevronUp,
   ClipboardList,
   Copy,
+  Edit2,
   Filter,
   KeyRound,
   Loader2,
@@ -32,7 +33,9 @@ import {
   Settings2,
   ShieldAlert,
   ShieldCheck,
+  ShoppingBag,
   Star,
+  Store,
   Trash2,
   TrendingUp,
   UserCheck,
@@ -54,7 +57,7 @@ import {
 import { toast } from "sonner";
 import { createActor } from "../backend";
 import { OrderStatus, UserRole } from "../backend.d";
-import type { AuditEntry } from "../backend.d";
+import type { AuditEntry, UserId } from "../backend.d";
 import { OtpModal } from "../components/OtpModal";
 import { type AdminCategory, useAdmin } from "../hooks/useAdmin";
 import { useAdminApprovals } from "../hooks/useAdminApprovals";
@@ -63,6 +66,12 @@ import {
   useAdminPendingPayments,
   useApproveAdminPayment,
 } from "../hooks/useAdminPayments";
+import {
+  useAddProduct,
+  useAdminAllProducts,
+  useDeleteProduct,
+  useUpdateProduct,
+} from "../hooks/useAdminProducts";
 import {
   useAdminPendingWithdrawals,
   useAdminWithdrawalAction,
@@ -81,6 +90,7 @@ import {
   useTopProducts,
   useTopSellers,
 } from "../hooks/useCommission";
+import type { BackendProduct, NewProduct, StockStatus } from "../types";
 
 // --- Helpers ---
 function getPasswordStrength(pw: string): {
@@ -2386,6 +2396,710 @@ function UserManagementTab({ adminUserId }: { adminUserId: string }) {
   );
 }
 
+// ==================== ALL PRODUCTS TAB ====================
+
+const STOCK_STATUS_OPTIONS: { value: StockStatus; label: string }[] = [
+  { value: "in_stock", label: "In Stock" },
+  { value: "out_of_stock", label: "Out of Stock" },
+  { value: "limited", label: "Limited" },
+];
+
+const SUBCATEGORY_OPTIONS = [
+  "Electronics",
+  "Clothing",
+  "Food",
+  "Home & Living",
+  "Sports",
+  "Beauty",
+  "Other",
+];
+
+const STOCK_BADGE: Record<StockStatus, string> = {
+  in_stock: "bg-chart-3/15 text-chart-3 border-chart-3/30",
+  out_of_stock: "bg-destructive/15 text-destructive border-destructive/30",
+  limited: "bg-secondary/15 text-secondary border-secondary/30",
+};
+const STOCK_LABEL: Record<StockStatus, string> = {
+  in_stock: "In Stock",
+  out_of_stock: "Out of Stock",
+  limited: "Limited",
+};
+
+const emptyForm = (): NewProduct => ({
+  name: "",
+  description: "",
+  images: [""],
+  sellerName: "",
+  shopName: "",
+  shopDescription: "",
+  subcategory: "Electronics",
+  price: 0,
+  stockStatus: "in_stock",
+});
+
+interface ProductFormProps {
+  initial?: BackendProduct | null;
+  onSave: (data: NewProduct & { id?: string }) => Promise<void>;
+  onCancel: () => void;
+  isSaving: boolean;
+}
+
+function ProductForm({
+  initial,
+  onSave,
+  onCancel,
+  isSaving,
+}: ProductFormProps) {
+  const [form, setForm] = useState<NewProduct>(
+    initial
+      ? {
+          name: initial.name,
+          description: initial.description,
+          images: initial.images.length ? initial.images : [""],
+          sellerName: initial.sellerName,
+          shopName: initial.shopName,
+          shopDescription: initial.shopDescription,
+          subcategory: initial.subcategory,
+          price: initial.price,
+          stockStatus: initial.stockStatus,
+        }
+      : emptyForm(),
+  );
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (!form.name.trim()) e.name = "Product name is required";
+    if (!form.description.trim()) e.description = "Description is required";
+    if (!form.price || form.price <= 0)
+      e.price = "Price must be greater than 0";
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validate()) return;
+    await onSave({ ...form, id: initial?.id });
+  };
+
+  const setImage = (idx: number, val: string) => {
+    setForm((f) => {
+      const imgs = [...f.images];
+      imgs[idx] = val;
+      return { ...f, images: imgs };
+    });
+  };
+
+  const addImage = () => setForm((f) => ({ ...f, images: [...f.images, ""] }));
+  const removeImage = (idx: number) =>
+    setForm((f) => ({ ...f, images: f.images.filter((_, i) => i !== idx) }));
+
+  return (
+    <div
+      className="rounded-2xl border border-primary/20 overflow-hidden mt-4"
+      data-ocid="product-form"
+    >
+      <div className="bg-gradient-to-r from-primary/20 via-accent/15 to-secondary/20 px-5 py-4">
+        <h3 className="font-display font-bold text-foreground text-sm flex items-center gap-2">
+          {initial ? <Edit2 size={15} /> : <Plus size={15} />}
+          {initial ? "Edit Product" : "Add New Product"}
+        </h3>
+      </div>
+
+      <form
+        onSubmit={(e) => void handleSubmit(e)}
+        className="bg-card p-5 space-y-5"
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Name */}
+          <div className="space-y-1.5">
+            <Label htmlFor="pf-name" className="text-xs font-semibold">
+              📦 Product Name *
+            </Label>
+            <Input
+              id="pf-name"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="Enter product name"
+              data-ocid="pf-name"
+            />
+            {errors.name && (
+              <p className="text-xs text-destructive">{errors.name}</p>
+            )}
+          </div>
+
+          {/* Price */}
+          <div className="space-y-1.5">
+            <Label htmlFor="pf-price" className="text-xs font-semibold">
+              💰 Price (৳) *
+            </Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-semibold">
+                ৳
+              </span>
+              <Input
+                id="pf-price"
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={form.price || ""}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    price: Number.parseFloat(e.target.value) || 0,
+                  }))
+                }
+                className="pl-7"
+                placeholder="0.00"
+                data-ocid="pf-price"
+              />
+            </div>
+            {errors.price && (
+              <p className="text-xs text-destructive">{errors.price}</p>
+            )}
+          </div>
+
+          {/* Subcategory */}
+          <div className="space-y-1.5">
+            <Label htmlFor="pf-subcat" className="text-xs font-semibold">
+              🏷️ Subcategory
+            </Label>
+            <select
+              id="pf-subcat"
+              value={form.subcategory}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, subcategory: e.target.value }))
+              }
+              className="w-full text-sm border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              data-ocid="pf-subcat"
+            >
+              {SUBCATEGORY_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Stock Status */}
+          <div className="space-y-1.5">
+            <Label htmlFor="pf-stock" className="text-xs font-semibold">
+              📊 Stock Status
+            </Label>
+            <select
+              id="pf-stock"
+              value={form.stockStatus}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  stockStatus: e.target.value as StockStatus,
+                }))
+              }
+              className="w-full text-sm border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              data-ocid="pf-stock"
+            >
+              {STOCK_STATUS_OPTIONS.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Seller Name */}
+          <div className="space-y-1.5">
+            <Label htmlFor="pf-seller" className="text-xs font-semibold">
+              🏪 Seller Name
+            </Label>
+            <Input
+              id="pf-seller"
+              value={form.sellerName}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, sellerName: e.target.value }))
+              }
+              placeholder="Seller display name"
+              data-ocid="pf-seller"
+            />
+          </div>
+
+          {/* Shop Name */}
+          <div className="space-y-1.5">
+            <Label htmlFor="pf-shop" className="text-xs font-semibold">
+              🏬 Shop Name
+            </Label>
+            <Input
+              id="pf-shop"
+              value={form.shopName}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, shopName: e.target.value }))
+              }
+              placeholder="Shop or store name"
+              data-ocid="pf-shop"
+            />
+          </div>
+        </div>
+
+        {/* Description */}
+        <div className="space-y-1.5">
+          <Label htmlFor="pf-desc" className="text-xs font-semibold">
+            📝 Description *
+          </Label>
+          <textarea
+            id="pf-desc"
+            value={form.description}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, description: e.target.value }))
+            }
+            rows={3}
+            placeholder="Detailed product description…"
+            className="w-full text-sm border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+            data-ocid="pf-desc"
+          />
+          {errors.description && (
+            <p className="text-xs text-destructive">{errors.description}</p>
+          )}
+        </div>
+
+        {/* Shop Description */}
+        <div className="space-y-1.5">
+          <Label htmlFor="pf-shopdesc" className="text-xs font-semibold">
+            📖 Shop Description
+          </Label>
+          <textarea
+            id="pf-shopdesc"
+            value={form.shopDescription}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, shopDescription: e.target.value }))
+            }
+            rows={2}
+            placeholder="About this shop or seller…"
+            className="w-full text-sm border border-border rounded-md px-3 py-2 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+            data-ocid="pf-shopdesc"
+          />
+        </div>
+
+        {/* Images */}
+        <div className="space-y-2">
+          <Label className="text-xs font-semibold">
+            🖼️ Product Images (URLs)
+          </Label>
+          {form.images.map((img, i) => (
+            <div
+              key={`img-slot-${i}-${form.images.length}`}
+              className="flex gap-2"
+            >
+              <Input
+                value={img}
+                onChange={(e) => setImage(i, e.target.value)}
+                placeholder={
+                  i === 0
+                    ? "Primary image URL (required for display)"
+                    : "Additional image URL"
+                }
+                className="flex-1"
+                data-ocid={`pf-image-${i}`}
+              />
+              {form.images.length > 1 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => removeImage(i)}
+                  className="border-destructive/40 text-destructive hover:bg-destructive/10 shrink-0"
+                  aria-label="Remove this image URL"
+                  data-ocid={`pf-remove-image-${i}`}
+                >
+                  <X size={14} />
+                </Button>
+              )}
+            </div>
+          ))}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addImage}
+            className="text-xs"
+            data-ocid="pf-add-image"
+          >
+            <Plus size={13} /> Add another image
+          </Button>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3 pt-2 border-t border-border">
+          <Button
+            type="submit"
+            disabled={isSaving}
+            className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white border-0 hover:opacity-90"
+            data-ocid="pf-save"
+          >
+            {isSaving ? (
+              <Loader2 size={15} className="animate-spin" />
+            ) : (
+              <Save size={15} />
+            )}
+            {initial ? "Save Changes" : "Add Product"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            data-ocid="pf-cancel"
+          >
+            Cancel
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function AllProductsTab() {
+  const { data: products, isLoading, isError } = useAdminAllProducts();
+  const { mutateAsync: addProduct, isPending: isAdding } = useAddProduct();
+  const { mutateAsync: updateProduct, isPending: isUpdating } =
+    useUpdateProduct();
+  const { mutateAsync: deleteProduct, isPending: isDeleting } =
+    useDeleteProduct();
+
+  const [formMode, setFormMode] = useState<"hidden" | "add" | "edit">("hidden");
+  const [editTarget, setEditTarget] = useState<BackendProduct | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({});
+
+  const isSaving = isAdding || isUpdating;
+
+  const openAdd = () => {
+    setEditTarget(null);
+    setFormMode("add");
+  };
+  const openEdit = (p: BackendProduct) => {
+    setEditTarget(p);
+    setFormMode("edit");
+  };
+  const closeForm = () => {
+    setFormMode("hidden");
+    setEditTarget(null);
+  };
+
+  const handleSave = async (data: NewProduct & { id?: string }) => {
+    try {
+      if (formMode === "edit" && data.id) {
+        await updateProduct({
+          id: data.id,
+          name: data.name,
+          description: data.description,
+          images: data.images.filter(Boolean),
+          sellerName: data.sellerName,
+          shopName: data.shopName,
+          shopDescription: data.shopDescription,
+          subcategory: data.subcategory,
+          price: data.price,
+          stockStatus: data.stockStatus,
+          // preserve existing fields
+          sellerId: editTarget!.sellerId as unknown as UserId,
+          rating: editTarget!.rating,
+          reviewCount: editTarget!.reviewCount,
+          createdAt: editTarget!.createdAt,
+          updatedAt: BigInt(Date.now()) * BigInt(1_000_000),
+        });
+        toast.success("Product updated!");
+      } else {
+        await addProduct({
+          id: crypto.randomUUID(),
+          name: data.name,
+          description: data.description,
+          images: data.images.filter(Boolean),
+          sellerName: data.sellerName,
+          shopName: data.shopName,
+          shopDescription: data.shopDescription,
+          subcategory: data.subcategory,
+          price: data.price,
+          stockStatus: data.stockStatus,
+          sellerId: "" as unknown as UserId,
+          rating: 0,
+          reviewCount: BigInt(0),
+          createdAt: BigInt(Date.now()) * BigInt(1_000_000),
+          updatedAt: BigInt(Date.now()) * BigInt(1_000_000),
+        });
+        toast.success("Product added!");
+      }
+      closeForm();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to save product");
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteProduct(id);
+      toast.success("Product deleted");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to delete product");
+    } finally {
+      setDeleteConfirm(null);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Tab header */}
+      <div className="rounded-2xl overflow-hidden border border-violet-500/20">
+        <div className="bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 px-5 py-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center">
+                <ShoppingBag size={16} className="text-white" />
+              </div>
+              <div>
+                <h3 className="font-display font-bold text-white text-sm">
+                  All Products
+                </h3>
+                <p className="text-xs text-white/70 mt-0.5">
+                  {isLoading
+                    ? "Loading…"
+                    : `${(products ?? []).length} products in store`}
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              onClick={openAdd}
+              disabled={formMode !== "hidden"}
+              className="bg-white text-violet-700 hover:bg-white/90 font-semibold text-xs border-0 shrink-0"
+              data-ocid="admin-add-product-btn"
+            >
+              <Plus size={14} />
+              Add Product
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Inline form */}
+      {formMode !== "hidden" && (
+        <ProductForm
+          initial={editTarget}
+          onSave={handleSave}
+          onCancel={closeForm}
+          isSaving={isSaving}
+        />
+      )}
+
+      {/* Delete confirmation */}
+      {deleteConfirm && (
+        <div
+          className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 flex flex-col sm:flex-row items-start sm:items-center gap-3"
+          data-ocid="delete-confirm"
+        >
+          <AlertTriangle
+            size={18}
+            className="text-destructive shrink-0 mt-0.5 sm:mt-0"
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-foreground">
+              Delete this product?
+            </p>
+            <p className="text-xs text-muted-foreground">
+              This action cannot be undone.
+            </p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDeleteConfirm(null)}
+              data-ocid="delete-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
+              onClick={() => void handleDelete(deleteConfirm)}
+              data-ocid="delete-confirm-btn"
+            >
+              {isDeleting ? (
+                <Loader2 size={13} className="animate-spin" />
+              ) : (
+                <Trash2 size={13} />
+              )}
+              Delete
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Loading */}
+      {isLoading && (
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-14 w-full rounded-lg" />
+          ))}
+        </div>
+      )}
+
+      {/* Error */}
+      {isError && (
+        <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-4 py-3">
+          <ShieldAlert size={15} />
+          Failed to load products. Please try again.
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!isLoading && !isError && (products ?? []).length === 0 && (
+        <div
+          className="text-center py-16 rounded-xl border border-dashed border-border bg-muted/20"
+          data-ocid="admin-products-empty"
+        >
+          <Store size={40} className="mx-auto mb-3 text-muted-foreground/40" />
+          <p className="font-display font-semibold text-foreground">
+            No products yet
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Click "Add Product" above to add your first product.
+          </p>
+        </div>
+      )}
+
+      {/* Product table */}
+      {!isLoading && !isError && (products ?? []).length > 0 && (
+        <div
+          className="rounded-xl border border-border overflow-hidden"
+          data-ocid="admin-products-table"
+        >
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-muted/40 border-b border-border">
+                {[
+                  "",
+                  "Name",
+                  "Seller",
+                  "Category",
+                  "Price",
+                  "Stock",
+                  "Actions",
+                ].map((h) => (
+                  <th
+                    key={h}
+                    className={`px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap ${
+                      h === "Price"
+                        ? "text-right"
+                        : h === "Actions"
+                          ? "text-center"
+                          : "text-left"
+                    }`}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(products ?? []).map((p, i) => (
+                <tr
+                  key={p.id}
+                  className={`border-b border-border/40 hover:bg-muted/20 transition-colors ${i % 2 === 0 ? "bg-card" : "bg-background"}`}
+                  data-ocid={`admin-product-row-${p.id}`}
+                >
+                  {/* Image */}
+                  <td className="px-3 py-2.5 w-10">
+                    {p.images[0] && !imgErrors[p.id] ? (
+                      <img
+                        src={p.images[0]}
+                        alt={p.name}
+                        className="w-9 h-9 rounded-lg object-cover border border-border"
+                        onError={() =>
+                          setImgErrors((e) => ({ ...e, [p.id]: true }))
+                        }
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-lg bg-muted/50 flex items-center justify-center text-lg border border-border">
+                        📦
+                      </div>
+                    )}
+                  </td>
+                  {/* Name */}
+                  <td className="px-3 py-2.5 max-w-[160px]">
+                    <p className="font-medium text-foreground truncate">
+                      {p.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {p.description.slice(0, 48)}
+                      {p.description.length > 48 ? "…" : ""}
+                    </p>
+                  </td>
+                  {/* Seller */}
+                  <td className="px-3 py-2.5 max-w-[120px]">
+                    <p className="text-xs text-foreground truncate">
+                      {p.sellerName || "—"}
+                    </p>
+                    {p.shopName && (
+                      <p className="text-xs text-muted-foreground truncate">
+                        {p.shopName}
+                      </p>
+                    )}
+                  </td>
+                  {/* Category */}
+                  <td className="px-3 py-2.5">
+                    <span className="text-xs bg-muted/60 text-foreground/70 px-2 py-0.5 rounded-full border border-border/50 whitespace-nowrap">
+                      {p.subcategory || "—"}
+                    </span>
+                  </td>
+                  {/* Price */}
+                  <td className="px-3 py-2.5 text-right font-display font-bold text-primary whitespace-nowrap">
+                    ৳{p.price.toLocaleString()}
+                  </td>
+                  {/* Stock */}
+                  <td className="px-3 py-2.5">
+                    <Badge
+                      variant="outline"
+                      className={`text-xs border whitespace-nowrap ${STOCK_BADGE[p.stockStatus as StockStatus] ?? STOCK_BADGE.in_stock}`}
+                    >
+                      {STOCK_LABEL[p.stockStatus as StockStatus] ??
+                        p.stockStatus}
+                    </Badge>
+                  </td>
+                  {/* Actions */}
+                  <td className="px-3 py-2.5">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2.5 text-xs"
+                        onClick={() => openEdit(p)}
+                        disabled={formMode !== "hidden"}
+                        data-ocid={`admin-edit-product-${p.id}`}
+                      >
+                        <Edit2 size={12} />
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2.5 border-destructive/40 text-destructive hover:bg-destructive/10"
+                        onClick={() => setDeleteConfirm(p.id)}
+                        disabled={isDeleting}
+                        data-ocid={`admin-delete-product-${p.id}`}
+                      >
+                        <Trash2 size={12} />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ==================== MAIN ADMIN PAGE ====================
 export function AdminPage() {
   const {
@@ -2912,6 +3626,17 @@ export function AdminPage() {
                   <Scale size={13} className="mr-1 hidden sm:inline shrink-0" />
                   Seller Audit
                 </TabsTrigger>
+                <TabsTrigger
+                  value="products"
+                  className="flex-1 min-w-[85px] text-xs sm:text-sm"
+                  data-ocid="admin-main-tab-products"
+                >
+                  <ShoppingBag
+                    size={13}
+                    className="mr-1 hidden sm:inline shrink-0"
+                  />
+                  Products
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="dashboard">
@@ -3057,6 +3782,10 @@ export function AdminPage() {
 
               <TabsContent value="seller-audit">
                 <SellerAuditTrailTab />
+              </TabsContent>
+
+              <TabsContent value="products">
+                <AllProductsTab />
               </TabsContent>
             </Tabs>
           </CardContent>

@@ -97,3 +97,43 @@ export interface SubmitPaymentInput {
   transactionId: string;
   amount: number;
 }
+
+// Backend product types
+export type StockStatus = "in_stock" | "out_of_stock" | "limited";
+
+export interface BackendProduct {
+  id: string;
+  name: string;
+  description: string;
+  images: string[];
+  sellerId: string;
+  sellerName: string;
+  shopName: string;
+  shopDescription: string;
+  subcategory: string;
+  price: number;
+  stockStatus: StockStatus;
+  rating: number;
+  reviewCount: bigint;
+  createdAt: bigint;
+  updatedAt: bigint;
+}
+
+export interface NewProduct {
+  name: string;
+  description: string;
+  images: string[];
+  sellerName: string;
+  shopName: string;
+  shopDescription: string;
+  subcategory: string;
+  price: number;
+  stockStatus: StockStatus;
+}
+
+export interface ShopOwnerProfile {
+  userId: string;
+  shopName: string;
+  shopDescription: string;
+  updatedAt: bigint;
+}
