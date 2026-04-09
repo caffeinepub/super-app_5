@@ -305,6 +305,7 @@ export const mockBackend: backendInterface = {
   rejectWithdrawal: async () => false,
   requestAdminRole: async () => ({ __kind__: "ok", ok: "Request submitted" }),
   requestWithdrawal: async () => BigInt(1),
+  resetAdminLockout: async () => undefined,
   resetAdminPassword: async () => ({ __kind__: "ok", ok: null }),
   setUserProfile: async () => undefined,
   setupAdminPassword: async () => ({ __kind__: "ok", ok: null }),

@@ -330,6 +330,7 @@ export interface backendInterface {
         err: string;
     }>;
     requestWithdrawal(amount: number, method: PaymentMethod, accountNumber: string): Promise<bigint>;
+    resetAdminLockout(): Promise<void>;
     resetAdminPassword(oldHash: string, newHash: string): Promise<{
         __kind__: "ok";
         ok: null;
@@ -1239,6 +1240,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.requestWithdrawal(arg0, to_candid_PaymentMethod_n39(this._uploadFile, this._downloadFile, arg1), arg2);
+            return result;
+        }
+    }
+    async resetAdminLockout(): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.resetAdminLockout();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.resetAdminLockout();
             return result;
         }
     }

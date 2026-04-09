@@ -245,6 +245,7 @@ export interface _SERVICE {
   'rejectWithdrawal' : ActorMethod<[bigint], boolean>,
   'requestAdminRole' : ActorMethod<[], { 'ok' : string } | { 'err' : string }>,
   'requestWithdrawal' : ActorMethod<[number, PaymentMethod, string], bigint>,
+  'resetAdminLockout' : ActorMethod<[], undefined>,
   'resetAdminPassword' : ActorMethod<
     [string, string],
     { 'ok' : null } |

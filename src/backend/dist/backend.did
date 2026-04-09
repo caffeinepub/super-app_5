@@ -289,6 +289,7 @@ service : {
                            });
   requestWithdrawal: (amount: float64, method: PaymentMethod, accountNumber:
    text) -> (nat);
+  resetAdminLockout: () -> ();
   resetAdminPassword: (oldHash: text, newHash: text) ->
    (variant {
       err: text;
@@ -314,6 +315,6 @@ service : {
     });
   updateProduct: (product: Product) -> ();
   updateShopOwnerProfile: (profile: ShopOwnerProfile) -> ();
-  verifyAdminPassword: (passwordHash: text) -> (bool) query;
+  verifyAdminPassword: (passwordHash: text) -> (bool);
   verifyOtp: (userId: text, action: text, code: text) -> (bool);
 }

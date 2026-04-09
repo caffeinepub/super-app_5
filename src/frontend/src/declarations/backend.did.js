@@ -336,6 +336,7 @@ export const idlService = IDL.Service({
       [IDL.Nat],
       [],
     ),
+  'resetAdminLockout' : IDL.Func([], [], []),
   'resetAdminPassword' : IDL.Func(
       [IDL.Text, IDL.Text],
       [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
@@ -365,7 +366,7 @@ export const idlService = IDL.Service({
     ),
   'updateProduct' : IDL.Func([Product], [], []),
   'updateShopOwnerProfile' : IDL.Func([ShopOwnerProfile], [], []),
-  'verifyAdminPassword' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
+  'verifyAdminPassword' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'verifyOtp' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
 });
 
@@ -697,6 +698,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Nat],
         [],
       ),
+    'resetAdminLockout' : IDL.Func([], [], []),
     'resetAdminPassword' : IDL.Func(
         [IDL.Text, IDL.Text],
         [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
@@ -726,7 +728,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'updateProduct' : IDL.Func([Product], [], []),
     'updateShopOwnerProfile' : IDL.Func([ShopOwnerProfile], [], []),
-    'verifyAdminPassword' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
+    'verifyAdminPassword' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'verifyOtp' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Bool], []),
   });
 };

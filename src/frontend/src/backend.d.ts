@@ -248,6 +248,7 @@ export interface backendInterface {
         err: string;
     }>;
     requestWithdrawal(amount: number, method: PaymentMethod, accountNumber: string): Promise<bigint>;
+    resetAdminLockout(): Promise<void>;
     resetAdminPassword(oldHash: string, newHash: string): Promise<{
         __kind__: "ok";
         ok: null;

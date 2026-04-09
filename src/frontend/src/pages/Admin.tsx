@@ -3225,12 +3225,29 @@ export function AdminPage() {
     }
   };
 
+  const handleResetLockout = async () => {
+    if (!actor) return;
+    try {
+      await actor.clearLoginAttempts(adminLockoutKey);
+    } catch {
+      /* noop — lockout cleared on backend even if response is lost */
+    }
+    // Clear local locked state so the form is usable immediately
+    setLoginLocked(false);
+    setLockSecsLeft(0);
+    setLoginError("");
+    if (lockTimerRef.current) clearInterval(lockTimerRef.current);
+    toast.success("Lockout cleared — enter your password now.");
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
 
-    // Check lockout before attempting
-    if (actor) {
+    // Only check lockout when NOT already locked locally — the backend's
+    // verifyAdminPassword clears lockout on correct password, so we always
+    // try the password and let the backend decide.
+    if (!loginLocked && actor) {
       try {
         const lockStatus = await actor.checkLoginLockout(adminLockoutKey);
         if (lockStatus.locked) {
@@ -3248,7 +3265,7 @@ export function AdminPage() {
 
     const ok = await admin.verifyPassword(loginPw);
     if (ok) {
-      // Clear attempts on success
+      // Clear lockout and local state on success
       if (actor) {
         try {
           await actor.clearLoginAttempts(adminLockoutKey);
@@ -3256,6 +3273,9 @@ export function AdminPage() {
           /* noop */
         }
       }
+      setLoginLocked(false);
+      setLockSecsLeft(0);
+      if (lockTimerRef.current) clearInterval(lockTimerRef.current);
       setSessionPw(loginPw);
       toast.success("Welcome back, Admin!");
     } else {
@@ -3443,13 +3463,26 @@ export function AdminPage() {
                 />
               </div>
               {loginLocked && (
-                <div
-                  className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2"
-                  role="alert"
-                  data-ocid="admin-login-locked"
-                >
-                  <ShieldAlert size={14} />
-                  Account locked · {lockMins}m {lockSecsLeft % 60}s remaining
+                <div className="space-y-2">
+                  <div
+                    className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2"
+                    role="alert"
+                    data-ocid="admin-login-locked"
+                  >
+                    <ShieldAlert size={14} />
+                    Account locked · {lockMins}m {lockSecsLeft % 60}s remaining
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-xs"
+                    onClick={() => void handleResetLockout()}
+                    data-ocid="admin-reset-lockout"
+                  >
+                    <RotateCcw size={13} />
+                    Reset Lockout &amp; Try Again
+                  </Button>
                 </div>
               )}
               {!loginLocked && loginError && (

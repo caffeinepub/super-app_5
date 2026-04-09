@@ -74,7 +74,7 @@ actor {
   // Existing mixins — unchanged
   include ProfilesApi(profiles);
   include FeaturedApi(featured);
-  include AdminApi(adminState, featured);
+  include AdminApi(adminState, featured, lockouts);
 
   // Role and order mixins (roles-api now receives audit state)
   include RolesApi(roles, auditLog, auditCounter);
